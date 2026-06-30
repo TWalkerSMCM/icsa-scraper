@@ -53,6 +53,13 @@ for team in results:
 Every parser exposes a `parse(html, ...)` entry point and accepts either a raw
 HTML string or a pre-parsed `BeautifulSoup`.
 
+## Examples
+
+[`examples/quickstart.ipynb`](examples/quickstart.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/quickstart.ipynb)
+— a guided tour: assemble one regatta from its pages into a `RegattaScores`
+model, then a pandas DataFrame and a chart. Click the badge to run it in Colab.
+
 ## Google Colab
 
 ```python
@@ -100,6 +107,7 @@ Notes for Colab:
 
 ```bash
 pip install -e ".[dev,fetch,aws]"
+pre-commit install   # strips notebook outputs on commit (nbstripout)
 pytest
 mypy src
 ```

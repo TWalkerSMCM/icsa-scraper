@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "icsa-scraper"
+version = "0.1.0"
+description = "HTML parsers for college sailing results from scores.collegesailing.org (Techscore)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Thomas Walker" }]
+keywords = ["sailing", "icsa", "techscore", "college-sailing", "scraper", "parser"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Text Processing :: Markup :: HTML",
+]
+
+# Core: everything in scraper.parsers / adapter / models / cache needs only these.
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+# Async fetcher (scraper.fetcher) — only needed if you fetch pages yourself
+# rather than passing in HTML you already have.
+fetch = ["httpx[http2]>=0.27", "tenacity>=8.0"]
+# DynamoDB-backed ETag store (scraper.stores) — server/Lambda use only.
+aws = ["boto3>=1.34"]
+dev = ["pytest>=8.0", "mypy>=1.8"]
+
+[project.urls]
+Homepage = "https://github.com/TWalkerSMCM/icsa-scraper"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scraper"]
+
+# ── mypy (carried over from the monorepo) ──────────────────────────────────────
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_return_any = false
+no_implicit_optional = true
+
+# BeautifulSoup Tag["attr"] returns str | list[str] | None, producing false
+# positives on nearly every parser file. Suppress per-module rather than
+# littering the code with type: ignore comments.
+[[tool.mypy.overrides]]
+module = [
+    "scraper.parsers.*",
+    "scraper.adapter",
+    "scraper.live.*",
+]
+disable_error_code = ["arg-type", "union-attr", "index", "assignment", "operator", "return-value"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

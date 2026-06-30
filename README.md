@@ -26,7 +26,7 @@ The base install pulls only `beautifulsoup4` + `lxml`. Optional extras:
 
 | Extra   | Adds                  | For |
 |---------|-----------------------|-----|
-| `fetch` | `httpx`, `tenacity`   | the async `scraper.fetcher` page fetcher |
+| `fetch` | `httpx`, `tenacity`   | an HTTP client (`httpx`) for fetching pages yourself, plus the async `scraper.fetcher` |
 | `aws`   | `boto3`               | the DynamoDB ETag store in `scraper.stores` |
 
 ```bash
@@ -34,6 +34,10 @@ pip install "icsa-scraper[fetch] @ git+https://github.com/TWalkerSMCM/icsa-scrap
 ```
 
 ## Quick start
+
+The parsers don't fetch — the examples below use `httpx` for the GETs, so install
+the `fetch` extra (`pip install "icsa-scraper[fetch] @ git+..."`). Or bring your
+own client (`requests`, `urllib`) and skip the extra.
 
 ```python
 import httpx
@@ -63,7 +67,7 @@ model, then a pandas DataFrame and a chart. Click the badge to run it in Colab.
 ## Google Colab
 
 ```python
-!pip install -q "git+https://github.com/TWalkerSMCM/icsa-scraper"
+!pip install -q "icsa-scraper[fetch] @ git+https://github.com/TWalkerSMCM/icsa-scraper"
 
 import httpx
 from scraper.parsers import division

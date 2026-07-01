@@ -173,9 +173,9 @@ class Dataset:
 
 
 def _load_regatta(
-    client: "Client", season: str, slug: str, refresh: bool,
+    client: "Client", season: str, slug: str, refresh: bool, build_sailors: bool,
 ) -> tuple[Optional[Regatta], list[SailorRaceFinish], Optional[RegattaMeta]]:
-    """Fetch + assemble one regatta and its sailor-race rows.
+    """Fetch + assemble one regatta and (if ``build_sailors``) its sailor rows.
 
     Returns ``(regatta_or_None, sailor_rows, meta_or_None)``. The regatta is
     ``None`` when the overview/scores pages are absent or empty.
@@ -193,7 +193,7 @@ def _load_regatta(
         fs = client.fetch(urls.full_scores(season, slug), refresh=refresh, missing_ok=True)
         rot = client.fetch(urls.rotations(season, slug), refresh=refresh, missing_ok=True)
         reg: Regatta = team_scores(all_html, season, slug, full_scores_html=fs, rotations_html=rot)
-        if meta.has_sailors_page:
+        if build_sailors and meta.has_sailors_page:
             srh = client.fetch(urls.sailors(season, slug), refresh=refresh, missing_ok=True)
             if srh:
                 rows = _team_sailor_races(all_html, srh, season=season, slug=slug,
@@ -206,19 +206,20 @@ def _load_regatta(
     fleet = fleet_scores(fs, season, slug)
     if not fleet.teams:
         return None, [], meta
-    srh = None
-    if meta.has_sailors_page:
-        srh = client.fetch(urls.sailors(season, slug), refresh=refresh, missing_ok=True)
-    rows = _sailor_races(fs, srh, season=season, slug=slug)
+    if build_sailors:
+        srh = None
+        if meta.has_sailors_page:
+            srh = client.fetch(urls.sailors(season, slug), refresh=refresh, missing_ok=True)
+        rows = _sailor_races(fs, srh, season=season, slug=slug)
     return fleet, rows, meta
 
 
-def _collect(refs, client: "Client", refresh: bool) -> Dataset:
+def _collect(refs, client: "Client", refresh: bool, build_sailors: bool) -> Dataset:
     regattas: list[Regatta] = []
     sailor_rows: list[SailorRaceFinish] = []
     metas: dict[str, RegattaMeta] = {}
     for season, slug in refs:
-        reg, rows, meta = _load_regatta(client, season, slug, refresh)
+        reg, rows, meta = _load_regatta(client, season, slug, refresh, build_sailors)
         if meta is not None:
             metas[slug] = meta
         if reg is not None:
@@ -233,6 +234,7 @@ def load(
     only: Optional[list[str]] = None,
     client: Optional["Client"] = None,
     refresh: bool = False,
+    sailors: bool = True,
 ) -> Dataset:
     """Scrape one or more seasons into a queryable :class:`Dataset`.
 
@@ -243,6 +245,8 @@ def load(
         client: a configured ``scraper.Client``; one is created (and closed) if
             omitted.
         refresh: bypass the disk cache and re-fetch (use for live regattas).
+        sailors: build per-sailor rows. Set ``False`` to skip the ``/sailors/``
+            fetches when you only need results/finishes (e.g. school rankings).
 
     Returns:
         A ``Dataset``. This is a point-in-time snapshot; re-load (or pass
@@ -265,7 +269,7 @@ def load(
                 if index is None:
                     continue
                 refs.extend((season, stub.nick) for stub in _season_parser.parse(index, season))
-        return _collect(refs, client, refresh)
+        return _collect(refs, client, refresh, sailors)
     finally:
         if own_client:
             client.close()
@@ -276,6 +280,7 @@ def load_regattas(
     *,
     client: Optional["Client"] = None,
     refresh: bool = False,
+    sailors: bool = True,
 ) -> Dataset:
     """Load an explicit, possibly cross-season set of regattas into a Dataset.
 
@@ -285,13 +290,14 @@ def load_regattas(
             head-to-head queries that span seasons.
         client: a configured ``scraper.Client``; created/closed if omitted.
         refresh: bypass the disk cache and re-fetch.
+        sailors: build per-sailor rows (set ``False`` to skip ``/sailors/`` fetches).
     """
     from scraper.client import Client  # lazy
 
     own_client = client is None
     client = client or Client()
     try:
-        return _collect(list(refs), client, refresh)
+        return _collect(list(refs), client, refresh, sailors)
     finally:
         if own_client:
             client.close()

@@ -1,17 +1,20 @@
 """
 Synchronous, disk-cached HTTP client for scores.collegesailing.org.
 
-The blessed way to fetch pages: one ``httpx`` session and the rate-limit clock
-held as instance state (no module globals). Pair paths from ``scraper.urls``
-with :meth:`Client.fetch`. Requires the ``fetch`` extra (``httpx``).
+The blessed way to fetch pages: one ``httpx`` session, the rate-limit clock,
+and the cache directory all held as instance state (no module globals). Pair
+paths from ``scraper.urls`` with :meth:`Client.fetch`. Requires the ``fetch``
+extra (``httpx``, ``tenacity``).
 """
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from scraper import cache
 from scraper.fetcher import BASE_URL
@@ -24,12 +27,16 @@ class Client:
 
     Args:
         base_url: site root; paths from ``scraper.urls`` are appended.
-        cache_dir: on-disk cache location. ``None`` keeps the process default
-            (``SCRAPER_CACHE_DIR`` env, else ``./.scraper_cache``). Setting it
-            here points the shared cache at that directory.
+        cache_dir: on-disk cache location for this instance. ``None`` keeps
+            the process default (``SCRAPER_CACHE_DIR`` env, else
+            ``./.scraper_cache``). Each ``Client`` holds its own cache
+            directory — constructing one never affects other instances or
+            bare ``scraper.cache`` calls.
         user_agent: sent on every request.
         delay: minimum seconds between *live* (non-cached) requests. Default 0
             — the site is static S3; raise it only if you want to throttle.
+            Enforced across threads when one ``Client`` is shared by a
+            ``ThreadPoolExecutor`` (e.g. ``scraper.load(workers=...)``).
         timeout: per-request timeout in seconds.
     """
 
@@ -42,10 +49,10 @@ class Client:
         timeout: float = 30.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.cache_dir = Path(cache_dir) if cache_dir is not None else None
         self.delay = delay
         self._last = 0.0
-        if cache_dir is not None:
-            cache.CACHE_DIR = Path(cache_dir)
+        self._throttle_lock = threading.Lock()
         self._client = httpx.Client(
             headers={"User-Agent": user_agent},
             timeout=timeout,
@@ -56,11 +63,23 @@ class Client:
         return self.base_url + path
 
     def _throttle(self) -> None:
-        if self.delay:
-            wait = self.delay - (time.monotonic() - self._last)
-            if wait > 0:
-                time.sleep(wait)
-        self._last = time.monotonic()
+        # Held for the whole wait so concurrent callers serialize onto one
+        # rate-limit clock instead of all sleeping and firing at once.
+        with self._throttle_lock:
+            if self.delay:
+                wait = self.delay - (time.monotonic() - self._last)
+                if wait > 0:
+                    time.sleep(wait)
+            self._last = time.monotonic()
+
+    @retry(
+        retry=retry_if_exception_type(httpx.RequestError),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.5, min=0.5, max=1),
+        reraise=True,
+    )
+    def _get(self, url: str) -> httpx.Response:
+        return self._client.get(url)
 
     def fetch(
         self,
@@ -85,21 +104,24 @@ class Client:
         Raises:
             httpx.HTTPStatusError: on 404 (unless ``missing_ok``) or other
                 non-2xx responses.
-            httpx.RequestError: on transport failure.
+            httpx.RequestError: on transport failure, after 3 attempts with
+                short exponential backoff (0.5s, 1s) between retries.
         """
         url = self._url(path)
         if not refresh:
-            cached = cache.get(url)
-            if cached is not None and (max_age is None or (cache.age(url) or 0.0) <= max_age):
+            cached = cache.get(url, cache_dir=self.cache_dir)
+            if cached is not None and (
+                max_age is None or (cache.age(url, cache_dir=self.cache_dir) or 0.0) <= max_age
+            ):
                 return cached
 
         self._throttle()
-        resp = self._client.get(url)
+        resp = self._get(url)
         if resp.status_code == 404 and missing_ok:
             return None
         resp.raise_for_status()
         html = resp.text
-        cache.put(url, html)
+        cache.put(url, html, cache_dir=self.cache_dir)
         return html
 
     def close(self) -> None:

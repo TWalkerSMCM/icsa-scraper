@@ -1,14 +1,12 @@
 """Tests for date parsing in scraper/parsers/metadata.py."""
 
 from bs4 import BeautifulSoup
+
 from scraper.parsers.metadata import extract
 
 
 def _meta(date_text: str, datetime_attr: str):
-    html = (
-        f'<time itemprop="startDate" datetime="{datetime_attr}">'
-        f"{date_text}</time>"
-    )
+    html = f'<time itemprop="startDate" datetime="{datetime_attr}">{date_text}</time>'
     return extract(BeautifulSoup(html, "lxml"))
 
 

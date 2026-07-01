@@ -11,8 +11,9 @@ Each row has: tiebreaker, rank, burgee, team name, penalty, total, sailors, then
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+
 import re
+from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup, Tag
 
@@ -22,9 +23,9 @@ from scraper.parsers._soup import ensure_soup, extract_number
 @dataclass
 class RaceFinish:
     race_num: int
-    score: int | None     # penalized score (after penalties applied) — NOT the earned position.
-                          # For clean finishes, score == earned. None if not parseable.
-    modifier: str         # penalty code: "DNF", "DSQ", "OCS", etc. — empty if clean
+    score: int | None  # penalized score (after penalties applied) — NOT the earned position.
+    # For clean finishes, score == earned. None if not parseable.
+    modifier: str  # penalty code: "DNF", "DSQ", "OCS", etc. — empty if clean
 
 
 @dataclass
@@ -34,12 +35,12 @@ class TeamDivisionResult:
     team_name: str
     division: str
     total_score: int
-    penalty: str          # team-level penalty if shown (MRP/PFD etc.)
-    sailors: list[str]    # sailor names shown inline
+    penalty: str  # team-level penalty if shown (MRP/PFD etc.)
+    sailors: list[str]  # sailor names shown inline
     race_finishes: list[RaceFinish] = field(default_factory=list)
-    school_slug: str = ""       # from <a href="/schools/navy/"> in team cell
-    tiebreaker: str = ""        # symbol from cells[0] text
-    tiebreaker_note: str = ""   # explanation from cells[0] title attribute
+    school_slug: str = ""  # from <a href="/schools/navy/"> in team cell
+    tiebreaker: str = ""  # symbol from cells[0] text
+    tiebreaker_note: str = ""  # explanation from cells[0] title attribute
 
 
 def parse(html: str | BeautifulSoup, division: str) -> list[TeamDivisionResult]:
@@ -116,7 +117,7 @@ def _parse_table(table: Tag, division: str) -> list[TeamDivisionResult]:
         if team_cell:
             school_link = team_cell.find("a", href=True)
             if school_link:
-                m = re.search(r'/schools/([^/]+)/', school_link["href"])
+                m = re.search(r"/schools/([^/]+)/", school_link["href"])
                 if m:
                     school_slug = m.group(1)
 
@@ -141,25 +142,29 @@ def _parse_table(table: Tag, division: str) -> list[TeamDivisionResult]:
                 if col < len(cells):
                     cell = cells[col]
                     score, modifier = _parse_finish_cell(cell)
-                    race_finishes.append(RaceFinish(
-                        race_num=race_num,
-                        score=score,
-                        modifier=modifier,
-                    ))
+                    race_finishes.append(
+                        RaceFinish(
+                            race_num=race_num,
+                            score=score,
+                            modifier=modifier,
+                        )
+                    )
 
-        results.append(TeamDivisionResult(
-            rank=rank,
-            school_name=school_name,
-            team_name=team_name,
-            division=division,
-            total_score=total,
-            penalty=penalty,
-            sailors=sailors,
-            race_finishes=race_finishes,
-            school_slug=school_slug,
-            tiebreaker=tiebreaker,
-            tiebreaker_note=tiebreaker_note,
-        ))
+        results.append(
+            TeamDivisionResult(
+                rank=rank,
+                school_name=school_name,
+                team_name=team_name,
+                division=division,
+                total_score=total,
+                penalty=penalty,
+                sailors=sailors,
+                race_finishes=race_finishes,
+                school_slug=school_slug,
+                tiebreaker=tiebreaker,
+                tiebreaker_note=tiebreaker_note,
+            )
+        )
 
     return results
 

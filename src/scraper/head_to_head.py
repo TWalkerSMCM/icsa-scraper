@@ -8,12 +8,12 @@ detail — loads just those shared regattas. See :func:`head_to_head`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from scraper import urls
-from scraper.parsers.sailor_profile import parse as _parse_profile
 from scraper.dataset import load_regattas
-from scraper.views import HeadToHead, SharedRegatta, RaceEncounter
+from scraper.parsers.sailor_profile import parse as _parse_profile
+from scraper.views import HeadToHead, RaceEncounter, SharedRegatta
 
 if TYPE_CHECKING:
     from scraper.client import Client
@@ -24,7 +24,7 @@ def head_to_head(
     b: str,
     *,
     races: bool = False,
-    client: Optional["Client"] = None,
+    client: Client | None = None,
     refresh: bool = False,
 ) -> HeadToHead:
     """Compare two sailors by slug.
@@ -61,28 +61,43 @@ def head_to_head(
         shared: list[SharedRegatta] = []
         for key in sorted(a_by_key.keys() & b_by_key.keys()):
             ra, rb = a_by_key[key], b_by_key[key]
-            shared.append(SharedRegatta(
-                season=ra.season, slug=ra.slug, regatta_name=ra.regatta_name,
-                division=ra.division, place_a=ra.place, place_b=rb.place,
-                fleet_size=ra.fleet_size,
-            ))
+            shared.append(
+                SharedRegatta(
+                    season=ra.season,
+                    slug=ra.slug,
+                    regatta_name=ra.regatta_name,
+                    division=ra.division,
+                    place_a=ra.place,
+                    place_b=rb.place,
+                    fleet_size=ra.fleet_size,
+                )
+            )
 
         encounters: list[RaceEncounter] = []
         if races and shared:
             refs = sorted({(s.season, s.slug) for s in shared})
             data = load_regattas(refs, client=client, refresh=refresh)
-            a_races = {(r.regatta_slug, r.division, r.race_num): r.place
-                       for r in data.sailor(a).sailor_races}
-            b_races = {(r.regatta_slug, r.division, r.race_num): r.place
-                       for r in data.sailor(b).sailor_races}
-            for (slug, div, race_num) in sorted(a_races.keys() & b_races.keys()):
+            a_races = {
+                (r.regatta_slug, r.division, r.race_num): r.place
+                for r in data.sailor(a).sailor_races
+            }
+            b_races = {
+                (r.regatta_slug, r.division, r.race_num): r.place
+                for r in data.sailor(b).sailor_races
+            }
+            for slug, div, race_num in sorted(a_races.keys() & b_races.keys()):
                 # season from the shared refs (slug is unique within this set)
                 season = next(s.season for s in shared if s.slug == slug)
-                encounters.append(RaceEncounter(
-                    season=season, regatta_slug=slug, division=div, race_num=race_num,
-                    place_a=a_races[(slug, div, race_num)],
-                    place_b=b_races[(slug, div, race_num)],
-                ))
+                encounters.append(
+                    RaceEncounter(
+                        season=season,
+                        regatta_slug=slug,
+                        division=div,
+                        race_num=race_num,
+                        place_a=a_races[(slug, div, race_num)],
+                        place_b=b_races[(slug, div, race_num)],
+                    )
+                )
 
         return HeadToHead(a=a, b=b, shared=shared, races=encounters)
     finally:

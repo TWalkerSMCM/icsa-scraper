@@ -14,43 +14,43 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 from bs4 import BeautifulSoup
 
-from scraper.parsers._soup import ensure_soup
-
 from scraper.models import (
-    RaceScore,
     DivisionResult,
-    TeamResult,
+    RaceScore,
     RegattaScores,
     TeamRaceMatch,
     TeamRaceRound,
     TeamRaceTeam,
     TeamRegattaScores,
+    TeamResult,
 )
-from scraper.school_names import short_name
-from scraper.parsers.metadata import PageMeta, extract as extract_page_meta
-from scraper.parsers.full_scores import TeamDivScore, RaceScore as TechRaceScore
-from scraper.parsers.team_all_races import RoundInfo, TeamRaceResult
+from scraper.parsers._soup import ensure_soup
+from scraper.parsers.full_scores import RaceScore as TechRaceScore
+from scraper.parsers.full_scores import TeamDivScore
+from scraper.parsers.metadata import extract as extract_page_meta
 from scraper.parsers.regatta import TeamScore as TeamRankingScore
-
+from scraper.parsers.team_all_races import RoundInfo, TeamRaceResult
+from scraper.school_names import short_name
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _school_slug(url: str) -> str:
-    m = re.search(r'/schools/([^/]+)/', url)
+    m = re.search(r"/schools/([^/]+)/", url)
     return m.group(1) if m else ""
 
 
-def _parse_title(title: str) -> tuple[Optional[str], Optional[str]]:
+def _parse_title(title: str) -> tuple[str | None, str | None]:
     """Extract (formula, comment) from title like '(15, Fleet + 1) RC comment'."""
     if not title:
         return None, None
-    m = re.match(r'\(\d+[,:]\s*(.*?)\)\s*(.*)', title)
+    m = re.match(r"\(\d+[,:]\s*(.*?)\)\s*(.*)", title)
     if m:
         return m.group(1).strip(), (m.group(2).strip() or None)
     return None, None
@@ -106,7 +106,9 @@ def _extract_fleet_context(
             if not team_name and i + 1 < len(rows):
                 next_row = rows[i + 1]
                 next_cls = next_row.get("class", [])
-                is_div_row = any(c.startswith("div") for c in next_cls) and "totalrow" not in next_cls
+                is_div_row = (
+                    any(c.startswith("div") for c in next_cls) and "totalrow" not in next_cls
+                )
                 if is_div_row:
                     next_tds = next_row.find_all("td")
                     if len(next_tds) >= 3:
@@ -147,12 +149,13 @@ def _extract_team_context(soup: BeautifulSoup) -> tuple[dict[str, tuple[str, str
 # Fleet racing adapter
 # ---------------------------------------------------------------------------
 
+
 def build_fleet_scores(
     html: str | BeautifulSoup,
     season: str,
     slug: str,
     div_scores: list[TeamDivScore],
-    division_ranks: Optional[dict[str, dict[str, int]]] = None,
+    division_ranks: dict[str, dict[str, int]] | None = None,
 ) -> RegattaScores:
     """Convert techscore full_scores output into a RegattaScores."""
     soup = ensure_soup(html)
@@ -197,8 +200,11 @@ def build_fleet_scores(
         total = 0
         for ds in group:
             # Filter out empty cells (unsailed races: score=None, no modifier)
-            races = [_convert_race_score(rs) for rs in ds.race_scores
-                     if rs.score is not None or rs.modifier]
+            races = [
+                _convert_race_score(rs)
+                for rs in ds.race_scores
+                if rs.score is not None or rs.modifier
+            ]
             rank = None
             if division_ranks and ds.division in division_ranks:
                 rank = division_ranks[ds.division].get(slug_id)
@@ -215,19 +221,31 @@ def build_fleet_scores(
         if context_key not in place_map:
             context_key = (school_url, "")
         tb_sym, tb_note = tiebreakers.get(context_key, ("", ""))
-        teams.append(TeamResult(
-            place=place_map.get(context_key, 0),
-            school=school_name, school_short=short_name(slug_id),
-            school_slug=slug_id, school_url=school_url,
-            team_name=team_name, total=total, divisions=divisions,
-            tiebreaker=tb_sym, tiebreaker_note=tb_note,
-        ))
+        teams.append(
+            TeamResult(
+                place=place_map.get(context_key, 0),
+                school=school_name,
+                school_short=short_name(slug_id),
+                school_slug=slug_id,
+                school_url=school_url,
+                team_name=team_name,
+                total=total,
+                divisions=divisions,
+                tiebreaker=tb_sym,
+                tiebreaker_note=tb_note,
+            )
+        )
 
     return RegattaScores(
-        name=meta.name, season=season, slug=slug,
-        scoring_type=meta.scoring_type, races_sailed=races_sailed,
-        host=meta.host, regatta_start=meta.regatta_start,
-        regatta_end=meta.regatta_end, is_final=meta.is_final,
+        name=meta.name,
+        season=season,
+        slug=slug,
+        scoring_type=meta.scoring_type,
+        races_sailed=races_sailed,
+        host=meta.host,
+        regatta_start=meta.regatta_start,
+        regatta_end=meta.regatta_end,
+        is_final=meta.is_final,
         teams=teams,
     )
 
@@ -238,6 +256,7 @@ class TeamRaw(TypedDict, total=False):
     total=False because ``place`` is assigned in a later pass, after the
     win/loss tallies are first constructed.
     """
+
     school: str
     school_url: str
     school_slug: str
@@ -273,14 +292,15 @@ def _team_tb(
 # Team racing adapter
 # ---------------------------------------------------------------------------
 
+
 def build_team_scores(
     html: str | BeautifulSoup,
     season: str,
     slug: str,
     rounds: list[RoundInfo],
     race_results: list[TeamRaceResult],
-    rankings: Optional[list[TeamRankingScore]] = None,
-    flights: Optional[dict[int, int]] = None,
+    rankings: list[TeamRankingScore] | None = None,
+    flights: dict[int, int] | None = None,
 ) -> TeamRegattaScores:
     """Convert techscore team_all_races output into a TeamRegattaScores.
 
@@ -326,8 +346,10 @@ def build_team_scores(
             if key not in team_data:
                 team_data[key] = {
                     "school": school_names.get(url, key[0]),
-                    "school_url": url, "team_name": tname,
-                    "school_slug": key[0], "rounds": {},
+                    "school_url": url,
+                    "team_name": tname,
+                    "school_slug": key[0],
+                    "rounds": {},
                 }
 
         sailed = bool(race.team1_earned) or bool(race.team2_earned)
@@ -335,15 +357,29 @@ def build_team_scores(
         flight = flight_by_race.get(race.race_number, 0)
 
         team_data[k1]["rounds"].setdefault(round_key, []).append(
-            TeamRaceMatch(race_num=race.race_number, opponent=s2,
-                          won=race.team1_won, our_positions=race.team1_earned,
-                          their_positions=race.team2_earned, sailed=sailed,
-                          tied=tied, flight=flight))
+            TeamRaceMatch(
+                race_num=race.race_number,
+                opponent=s2,
+                won=race.team1_won,
+                our_positions=race.team1_earned,
+                their_positions=race.team2_earned,
+                sailed=sailed,
+                tied=tied,
+                flight=flight,
+            )
+        )
         team_data[k2]["rounds"].setdefault(round_key, []).append(
-            TeamRaceMatch(race_num=race.race_number, opponent=s1,
-                          won=race.team2_won, our_positions=race.team2_earned,
-                          their_positions=race.team1_earned, sailed=sailed,
-                          tied=tied, flight=flight))
+            TeamRaceMatch(
+                race_num=race.race_number,
+                opponent=s1,
+                won=race.team2_won,
+                our_positions=race.team2_earned,
+                their_positions=race.team1_earned,
+                sailed=sailed,
+                tied=tied,
+                flight=flight,
+            )
+        )
 
     teams_raw: list[TeamRaw] = []
     for (sk, _tname), data in team_data.items():
@@ -352,18 +388,36 @@ def build_team_scores(
         for rk in round_order:
             matches = data["rounds"].get(rk, [])
             w = sum(1 for m in matches if m.sailed and m.won)
-            l = sum(1 for m in matches if m.sailed and not m.won and not m.tied)
+            losses = sum(1 for m in matches if m.sailed and not m.won and not m.tied)
             t = sum(1 for m in matches if m.sailed and m.tied)
-            tw += w; tl += l; tt += t
+            tw += w
+            tl += losses
+            tt += t
             rn = round_titles.get(rk, "Round 1")
             if matches:
-                team_rounds.append(TeamRaceRound(name=rn, wins=w, losses=l, ties=t,
-                                                 matches=sorted(matches, key=lambda m: m.race_num)))
+                team_rounds.append(
+                    TeamRaceRound(
+                        name=rn,
+                        wins=w,
+                        losses=losses,
+                        ties=t,
+                        matches=sorted(matches, key=lambda m: m.race_num),
+                    )
+                )
         d = tw + tl + tt
-        teams_raw.append({"school": data["school"], "school_url": data["school_url"],
-                          "school_slug": data["school_slug"], "team_name": data["team_name"],
-                          "total_wins": tw, "total_losses": tl, "total_ties": tt,
-                          "win_pct": tw / d if d else 0.0, "rounds": team_rounds})
+        teams_raw.append(
+            {
+                "school": data["school"],
+                "school_url": data["school_url"],
+                "school_slug": data["school_slug"],
+                "team_name": data["team_name"],
+                "total_wins": tw,
+                "total_losses": tl,
+                "total_ties": tt,
+                "win_pct": tw / d if d else 0.0,
+                "rounds": team_rounds,
+            }
+        )
 
     if team_place_map:
         # Use official positions scraped from the teamranking table.
@@ -384,18 +438,31 @@ def build_team_scores(
     teams = []
     for t in teams_raw:
         tiebreaker, tiebreaker_note = _team_tb(team_tb_map, team_tiebreakers, t)
-        teams.append(TeamRaceTeam(
-            place=t["place"], school=t["school"], school_short=short_name(t["school_slug"]),
-            school_slug=t["school_slug"], school_url=t["school_url"],
-            team_name=t["team_name"], total_wins=t["total_wins"],
-            total_losses=t["total_losses"], total_ties=t["total_ties"],
-            win_pct=t["win_pct"], rounds=t["rounds"],
-            tiebreaker=tiebreaker, tiebreaker_note=tiebreaker_note,
-        ))
+        teams.append(
+            TeamRaceTeam(
+                place=t["place"],
+                school=t["school"],
+                school_short=short_name(t["school_slug"]),
+                school_slug=t["school_slug"],
+                school_url=t["school_url"],
+                team_name=t["team_name"],
+                total_wins=t["total_wins"],
+                total_losses=t["total_losses"],
+                total_ties=t["total_ties"],
+                win_pct=t["win_pct"],
+                rounds=t["rounds"],
+                tiebreaker=tiebreaker,
+                tiebreaker_note=tiebreaker_note,
+            )
+        )
 
     return TeamRegattaScores(
-        name=meta.name, season=season, slug=slug,
-        host=meta.host, regatta_start=meta.regatta_start,
-        regatta_end=meta.regatta_end, is_final=meta.is_final,
+        name=meta.name,
+        season=season,
+        slug=slug,
+        host=meta.host,
+        regatta_start=meta.regatta_start,
+        regatta_end=meta.regatta_end,
+        is_final=meta.is_final,
         teams=teams,
     )

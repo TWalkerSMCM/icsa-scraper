@@ -14,17 +14,26 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date as date_type, timedelta
+from datetime import date as date_type
+from datetime import timedelta
 
 from bs4 import BeautifulSoup
 
 from scraper.parsers._soup import ensure_soup
 
-
 _MONTH_NUMS = {
-    "january": 1, "february": 2, "march": 3, "april": 4,
-    "may": 5, "june": 6, "july": 7, "august": 8,
-    "september": 9, "october": 10, "november": 11, "december": 12,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
 }
 
 # Key labels in the shared ul#page-info metadata list (span.page-info-key text).
@@ -37,12 +46,13 @@ PAGE_INFO_CONFERENCE = "Conference"
 @dataclass
 class PageMeta:
     """Metadata extracted from a Techscore page template."""
+
     name: str = ""
     host: str = ""
     is_final: bool = False
-    scoring_type: str = "divisional"   # "divisional", "combined", "team"
-    regatta_start: str = ""            # "YYYY-MM-DD"
-    regatta_end: str = ""              # "YYYY-MM-DD"
+    scoring_type: str = "divisional"  # "divisional", "combined", "team"
+    regatta_start: str = ""  # "YYYY-MM-DD"
+    regatta_end: str = ""  # "YYYY-MM-DD"
 
 
 def parse(html_or_soup: str | BeautifulSoup) -> PageMeta:
@@ -145,7 +155,7 @@ def extract_end_date(soup: BeautifulSoup) -> str:
         return _extract_start_date(soup)
 
     year = int(year_m.group(1))
-    date_part = text[:year_m.start()].strip().rstrip(",").strip()
+    date_part = text[: year_m.start()].strip().rstrip(",").strip()
 
     # "Month DD - Month DD" (cross-month)
     cross = re.match(r"(\w+)\s+\d+\s*-\s*(\w+)\s+(\d+)$", date_part, re.IGNORECASE)

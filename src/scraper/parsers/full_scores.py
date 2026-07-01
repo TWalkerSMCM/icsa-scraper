@@ -18,8 +18,9 @@ totalrow class → skip entirely.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+
 import re
+from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup, Tag
 
@@ -29,34 +30,34 @@ from scraper.parsers._soup import ensure_soup, extract_number
 @dataclass
 class RaceScore:
     race_num: int
-    score: int | None   # penalized score (after penalties applied) — NOT the earned position.
-                        # For clean finishes, score == earned. For penalized finishes, this is
-                        # the penalty points (e.g. fleet+1 for DNF). None if not parseable.
-    modifier: str       # e.g. "DNF", "DSQ", "" if clean
-    title: str = ""     # raw title attr from <td>, e.g. "(15, Fleet + 1) comment"
+    score: int | None  # penalized score (after penalties applied) — NOT the earned position.
+    # For clean finishes, score == earned. For penalized finishes, this is
+    # the penalty points (e.g. fleet+1 for DNF). None if not parseable.
+    modifier: str  # e.g. "DNF", "DSQ", "" if clean
+    title: str = ""  # raw title attr from <td>, e.g. "(15, Fleet + 1) comment"
 
 
 @dataclass
 class TeamDivScore:
-    school_name: str    # nick_name from divA row (or combined cell for singlehanded)
-    school_url: str     # href from school link e.g. "/schools/brown/f25/"
-    school_id: str      # extracted slug e.g. "brown"
-    team_name: str      # from divB row (or combined cell for singlehanded)
-    division: str       # "A", "B", "C", "D" — or "A" for singlehanded
-    penalty: str        # team penalty code e.g. "MRP", "PFD", or ""
+    school_name: str  # nick_name from divA row (or combined cell for singlehanded)
+    school_url: str  # href from school link e.g. "/schools/brown/f25/"
+    school_id: str  # extracted slug e.g. "brown"
+    team_name: str  # from divB row (or combined cell for singlehanded)
+    division: str  # "A", "B", "C", "D" — or "A" for singlehanded
+    penalty: str  # team penalty code e.g. "MRP", "PFD", or ""
     race_scores: list[RaceScore] = field(default_factory=list)
     div_total: int = 0
-    sailor_name: str = ""   # singlehanded only: sailor name from the cell
-    sailor_url: str = ""    # singlehanded only: link to /sailors/{slug}/
+    sailor_name: str = ""  # singlehanded only: sailor name from the cell
+    sailor_url: str = ""  # singlehanded only: link to /sailors/{slug}/
 
 
 @dataclass
 class PenaltyEntry:
-    school_url: str        # from team cell link
-    team_name: str         # text after school link
+    school_url: str  # from team cell link
+    team_name: str  # text after school link
     race_or_division: str  # "A4", "A", "3", "All"
-    penalty_type: str      # "DSQ", "MRP", "Discretionary", etc.
-    amount: str            # "14 points (Orig: 4)", "+20", "-0.5 wins"
+    penalty_type: str  # "DSQ", "MRP", "Discretionary", etc.
+    amount: str  # "14 points (Orig: 4)", "+20", "-0.5 wins"
     comments: str
 
 
@@ -86,21 +87,23 @@ def parse_penalties(html: str | BeautifulSoup) -> list[PenaltyEntry]:
         # Team name: full text minus the school link text
         full_text = team_cell.get_text(strip=True)
         school_text = a.get_text(strip=True) if a else ""
-        team_name = full_text[len(school_text):].strip() if school_text else full_text
+        team_name = full_text[len(school_text) :].strip() if school_text else full_text
 
         race_or_division = cells[1].get_text(strip=True)
         penalty_type = cells[2].get_text(strip=True)
         amount = cells[3].get_text(strip=True)
         comments = cells[4].get_text(strip=True)
 
-        results.append(PenaltyEntry(
-            school_url=school_url,
-            team_name=team_name,
-            race_or_division=race_or_division,
-            penalty_type=penalty_type,
-            amount=amount,
-            comments=comments,
-        ))
+        results.append(
+            PenaltyEntry(
+                school_url=school_url,
+                team_name=team_name,
+                race_or_division=race_or_division,
+                penalty_type=penalty_type,
+                amount=amount,
+                comments=comments,
+            )
+        )
 
     return results
 
@@ -170,7 +173,7 @@ def parse(html: str | BeautifulSoup) -> list[TeamDivScore]:
             # col0=tiebreaker, col1=rank, col2=school_or_team_or_blank,
             # col3=division_letter, col4..N=race_scores, col-2=penalty, col-1=div_total
             name_cell = cells[2] if len(cells) > 2 else None
-            div_cell  = cells[3] if len(cells) > 3 else None
+            div_cell = cells[3] if len(cells) > 3 else None
 
             if name_cell:
                 a = name_cell.find("a")
@@ -206,8 +209,11 @@ def parse(html: str | BeautifulSoup) -> list[TeamDivScore]:
                         current_sailor_name = sailor_a.get_text(strip=True)
                         current_sailor_url = sailor_a.get("href", "")
                     # School link is outside the span
-                    school_links = [a for a in name_cell.find_all("a")
-                                    if a.get("href", "").startswith("/schools/")]
+                    school_links = [
+                        a
+                        for a in name_cell.find_all("a")
+                        if a.get("href", "").startswith("/schools/")
+                    ]
                     if school_links:
                         current_school_name = school_links[0].get_text(strip=True)
                         current_school_url = school_links[0].get("href", "")
@@ -231,7 +237,9 @@ def parse(html: str | BeautifulSoup) -> list[TeamDivScore]:
                 continue
             score, modifier = _parse_score_cell(cell)
             title = cell.get("title", "").strip()
-            race_scores.append(RaceScore(race_num=race_num, score=score, modifier=modifier, title=title))
+            race_scores.append(
+                RaceScore(race_num=race_num, score=score, modifier=modifier, title=title)
+            )
 
         # Penalty cell is second-to-last; total is last
         # (PHP: penalty column before TOT column)
@@ -247,18 +255,20 @@ def parse(html: str | BeautifulSoup) -> list[TeamDivScore]:
         except (ValueError, IndexError):
             div_total = 0
 
-        results.append(TeamDivScore(
-            school_name=current_school_name,
-            school_url=current_school_url,
-            school_id=_school_id(current_school_url),
-            team_name=current_team_name,
-            division=division,
-            penalty=penalty,
-            race_scores=sorted(race_scores, key=lambda r: r.race_num),
-            div_total=div_total,
-            sailor_name=current_sailor_name,
-            sailor_url=current_sailor_url,
-        ))
+        results.append(
+            TeamDivScore(
+                school_name=current_school_name,
+                school_url=current_school_url,
+                school_id=_school_id(current_school_url),
+                team_name=current_team_name,
+                division=division,
+                penalty=penalty,
+                race_scores=sorted(race_scores, key=lambda r: r.race_num),
+                div_total=div_total,
+                sailor_name=current_sailor_name,
+                sailor_url=current_sailor_url,
+            )
+        )
 
     return _propagate_team_names(results)
 
@@ -285,10 +295,10 @@ def _propagate_team_names(rows: list[TeamDivScore]) -> list[TeamDivScore]:
         prev = current_group[-1]
         first = current_group[0]
         same_school = row.school_url == first.school_url
-        name_changed = (row.school_name and first.school_name
-                        and row.school_name != first.school_name)
-        div_reset = (same_school and row.division == "A"
-                     and prev.division in ("B", "C", "D"))
+        name_changed = (
+            row.school_name and first.school_name and row.school_name != first.school_name
+        )
+        div_reset = same_school and row.division == "A" and prev.division in ("B", "C", "D")
         if same_school and not name_changed and not div_reset:
             current_group.append(row)
         else:

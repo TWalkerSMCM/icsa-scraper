@@ -15,8 +15,9 @@ Extracts:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+
 import re
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
 
@@ -26,14 +27,14 @@ from scraper.parsers._soup import ensure_soup
 @dataclass
 class RpEntry:
     school_name: str
-    school_url: str    # e.g. "/schools/boston-college/f25/"
+    school_url: str  # e.g. "/schools/boston-college/f25/"
     team_name: str
     division: str
     rank: int | None
     sailor_name: str
-    sailor_url: str    # e.g. "/sailors/john-doe/"
-    boat_role: str     # "skipper" or "crew"
-    races: str         # race range string e.g. "1-3,5" or "" (all races)
+    sailor_url: str  # e.g. "/sailors/john-doe/"
+    boat_role: str  # "skipper" or "crew"
+    races: str  # race range string e.g. "1-3,5" or "" (all races)
 
 
 @dataclass
@@ -141,13 +142,15 @@ def _parse_table(table: Tag) -> tuple[list[RpEntry], list[ReserveEntry]]:
                 for span in cell.find_all("span", class_="reserve-entry"):
                     name, url = _extract_sailor(span)
                     if name:
-                        reserves.append(ReserveEntry(
-                            school_name=current_school,
-                            school_url=current_school_url,
-                            team_name=current_team,
-                            sailor_name=name,
-                            sailor_url=url,
-                        ))
+                        reserves.append(
+                            ReserveEntry(
+                                school_name=current_school,
+                                school_url=current_school_url,
+                                team_name=current_team,
+                                sailor_name=name,
+                                sailor_url=url,
+                            )
+                        )
             continue
 
         # Division cell (with rowspan tracking)
@@ -187,33 +190,37 @@ def _parse_table(table: Tag) -> tuple[list[RpEntry], list[ReserveEntry]]:
             name, url = _extract_sailor(skipper_cell)
             if name:
                 races = skipper_races_cell.get_text(strip=True) if skipper_races_cell else ""
-                entries.append(RpEntry(
-                    school_name=current_school,
-                    school_url=current_school_url,
-                    team_name=current_team,
-                    division=current_division,
-                    rank=current_rank,
-                    sailor_name=name,
-                    sailor_url=url,
-                    boat_role="skipper",
-                    races=races,
-                ))
+                entries.append(
+                    RpEntry(
+                        school_name=current_school,
+                        school_url=current_school_url,
+                        team_name=current_team,
+                        division=current_division,
+                        rank=current_rank,
+                        sailor_name=name,
+                        sailor_url=url,
+                        boat_role="skipper",
+                        races=races,
+                    )
+                )
 
         if crew_cell:
             name, url = _extract_sailor(crew_cell)
             if name:
                 races = crew_races_cell.get_text(strip=True) if crew_races_cell else ""
-                entries.append(RpEntry(
-                    school_name=current_school,
-                    school_url=current_school_url,
-                    team_name=current_team,
-                    division=current_division,
-                    rank=current_rank,
-                    sailor_name=name,
-                    sailor_url=url,
-                    boat_role="crew",
-                    races=races,
-                ))
+                entries.append(
+                    RpEntry(
+                        school_name=current_school,
+                        school_url=current_school_url,
+                        team_name=current_team,
+                        division=current_division,
+                        rank=current_rank,
+                        sailor_name=name,
+                        sailor_url=url,
+                        boat_role="crew",
+                        races=races,
+                    )
+                )
 
     return entries, reserves
 

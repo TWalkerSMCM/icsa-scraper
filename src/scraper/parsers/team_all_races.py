@@ -13,8 +13,9 @@ CSS classes on cells [2]/[3] and [5]/[6]:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+
 import re
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
 
@@ -23,24 +24,24 @@ from scraper.parsers._soup import ensure_soup
 
 @dataclass
 class RoundInfo:
-    title: str            # e.g. "Round 1", "Final Four"
-    relative_order: int   # sequential within the regatta
+    title: str  # e.g. "Round 1", "Final Four"
+    relative_order: int  # sequential within the regatta
 
 
 @dataclass
 class TeamRaceResult:
     race_number: int
-    round_order: int         # maps to RoundInfo.relative_order
+    round_order: int  # maps to RoundInfo.relative_order
     team1_school_url: str
-    team1_team_name: str     # team mascot e.g. "Bears"
-    team1_earned: list[int]      # earned positions e.g. [2, 4, 6] — physical finish per division
+    team1_team_name: str  # team mascot e.g. "Bears"
+    team1_earned: list[int]  # earned positions e.g. [2, 4, 6] — physical finish per division
     team1_won: bool
-    team1_penalties: list[str]   # per-division penalties, e.g. ["DSQ", "", "DNF"]
+    team1_penalties: list[str]  # per-division penalties, e.g. ["DSQ", "", "DNF"]
     team2_school_url: str
     team2_team_name: str
     team2_earned: list[int]
     team2_won: bool
-    team2_penalties: list[str]   # per-division penalties, e.g. ["", "", "DNS"]
+    team2_penalties: list[str]  # per-division penalties, e.g. ["", "", "DNS"]
 
 
 def parse(html: str | BeautifulSoup) -> tuple[list[RoundInfo], list[TeamRaceResult]]:
@@ -95,20 +96,22 @@ def parse(html: str | BeautifulSoup) -> tuple[list[RoundInfo], list[TeamRaceResu
         team2_earned, team2_penalties = _parse_places(cells[5].get_text(strip=True))
         team2_won = "tr-win" in (cells[6].get("class") or [])
 
-        results.append(TeamRaceResult(
-            race_number=race_number,
-            round_order=current_round_order,
-            team1_school_url=team1_school_url,
-            team1_team_name=team1_team_name,
-            team1_earned=team1_earned,
-            team1_won=team1_won,
-            team1_penalties=team1_penalties,
-            team2_school_url=team2_school_url,
-            team2_team_name=team2_team_name,
-            team2_earned=team2_earned,
-            team2_won=team2_won,
-            team2_penalties=team2_penalties,
-        ))
+        results.append(
+            TeamRaceResult(
+                race_number=race_number,
+                round_order=current_round_order,
+                team1_school_url=team1_school_url,
+                team1_team_name=team1_team_name,
+                team1_earned=team1_earned,
+                team1_won=team1_won,
+                team1_penalties=team1_penalties,
+                team2_school_url=team2_school_url,
+                team2_team_name=team2_team_name,
+                team2_earned=team2_earned,
+                team2_won=team2_won,
+                team2_penalties=team2_penalties,
+            )
+        )
 
     return rounds, results
 

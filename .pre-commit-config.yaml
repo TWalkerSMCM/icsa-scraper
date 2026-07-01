@@ -1,6 +1,54 @@
-# Keeps notebook outputs out of git. Install once: `pre-commit install`.
+# Run on every commit: `pre-commit install` once, then it's automatic.
+# Update pinned revs with: `pre-commit autoupdate`
+default_language_version:
+  python: python3
+
 repos:
+  # ── hygiene ────────────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: debug-statements
+      - id: mixed-line-ending
+
+  # ── lint + format (ruff) ─────────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # ── keep notebook outputs out of git ─────────────────────────────────────────
   - repo: https://github.com/kynan/nbstripout
-    rev: "0.7.1"
+    rev: "0.8.1"
     hooks:
       - id: nbstripout
+
+  # ── GitHub Actions security audit ────────────────────────────────────────────
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.5.2
+    hooks:
+      - id: zizmor
+
+  # ── types + tests (use the project's own env) ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy src
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: pytest
+        name: pytest
+        entry: pytest -q
+        language: system
+        pass_filenames: false
+        types: [python]

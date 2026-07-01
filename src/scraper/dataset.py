@@ -9,22 +9,23 @@ the "analysis library" surface — CSR, ELO, and comparisons all sit on top of i
 
 from __future__ import annotations
 
-from typing import Iterator, Optional, TYPE_CHECKING, Union
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from scraper.client import Client
 
 from scraper import urls
 from scraper.assemble import fleet_scores, team_scores
+from scraper.models import RegattaScores, TeamRegattaScores
+from scraper.parsers import regatta as _regatta_parser
+from scraper.parsers import season as _season_parser
+from scraper.parsers.regatta import RegattaMeta
 from scraper.sailor_races import sailor_races as _sailor_races
 from scraper.sailor_races import team_sailor_races as _team_sailor_races
-from scraper.models import RegattaScores, TeamRegattaScores
-from scraper.parsers import season as _season_parser
-from scraper.parsers import regatta as _regatta_parser
-from scraper.parsers.regatta import RegattaMeta
-from scraper.views import Result, Finish, SailorRaceFinish
+from scraper.views import Finish, Result, SailorRaceFinish
 
-Regatta = Union[RegattaScores, TeamRegattaScores]
+Regatta = RegattaScores | TeamRegattaScores
 
 
 class Dataset:
@@ -53,8 +54,10 @@ class Dataset:
         return len(self.regattas)
 
     def __repr__(self) -> str:
-        return (f"Dataset({len(self.regattas)} regattas, {len(self.results)} results, "
-                f"{len(self.sailor_races)} sailor-races)")
+        return (
+            f"Dataset({len(self.regattas)} regattas, {len(self.results)} results, "
+            f"{len(self.sailor_races)} sailor-races)"
+        )
 
     # ── construction ──────────────────────────────────────────────────────────
     @classmethod
@@ -62,8 +65,8 @@ class Dataset:
         cls,
         regattas: list[Regatta],
         sailor_races: list[SailorRaceFinish],
-        metas: Optional[dict[str, RegattaMeta]] = None,
-    ) -> "Dataset":
+        metas: dict[str, RegattaMeta] | None = None,
+    ) -> Dataset:
         """Derive the flat projections from assembled regattas.
 
         ``metas`` (regatta_slug → RegattaMeta) supplies overview-only context
@@ -76,27 +79,51 @@ class Dataset:
         for reg in regattas:
             if isinstance(reg, TeamRegattaScores):
                 for tt in reg.teams:
-                    results.append(Result(
-                        season=reg.season, regatta_slug=reg.slug, regatta_name=reg.name,
-                        scoring_type=reg.scoring_type, school_slug=tt.school_slug,
-                        school=tt.school, team_name=tt.team_name, place=tt.place,
-                        total=0, is_final=reg.is_final, start_time=reg.regatta_start,
-                    ))
+                    results.append(
+                        Result(
+                            season=reg.season,
+                            regatta_slug=reg.slug,
+                            regatta_name=reg.name,
+                            scoring_type=reg.scoring_type,
+                            school_slug=tt.school_slug,
+                            school=tt.school,
+                            team_name=tt.team_name,
+                            place=tt.place,
+                            total=0,
+                            is_final=reg.is_final,
+                            start_time=reg.regatta_start,
+                        )
+                    )
             else:
                 for t in reg.teams:
-                    results.append(Result(
-                        season=reg.season, regatta_slug=reg.slug, regatta_name=reg.name,
-                        scoring_type=reg.scoring_type, school_slug=t.school_slug,
-                        school=t.school, team_name=t.team_name, place=t.place,
-                        total=t.total, is_final=reg.is_final, start_time=reg.regatta_start,
-                    ))
+                    results.append(
+                        Result(
+                            season=reg.season,
+                            regatta_slug=reg.slug,
+                            regatta_name=reg.name,
+                            scoring_type=reg.scoring_type,
+                            school_slug=t.school_slug,
+                            school=t.school,
+                            team_name=t.team_name,
+                            place=t.place,
+                            total=t.total,
+                            is_final=reg.is_final,
+                            start_time=reg.regatta_start,
+                        )
+                    )
                     for div, dr in t.divisions.items():
                         for rc in dr.races:
-                            finishes.append(Finish(
-                                season=reg.season, regatta_slug=reg.slug,
-                                school_slug=t.school_slug, team_name=t.team_name,
-                                division=div, race_num=rc.race_num, place=rc.points,
-                            ))
+                            finishes.append(
+                                Finish(
+                                    season=reg.season,
+                                    regatta_slug=reg.slug,
+                                    school_slug=t.school_slug,
+                                    team_name=t.team_name,
+                                    division=div,
+                                    race_num=rc.race_num,
+                                    place=rc.points,
+                                )
+                            )
 
         # Enrich sailor-race rows with regatta context.
         reg_by_slug = {r.slug: r for r in regattas}
@@ -116,7 +143,7 @@ class Dataset:
         return cls(regattas, results, finishes, sailor_races)
 
     # ── filters (chainable) ───────────────────────────────────────────────────
-    def _narrow(self, keep_slugs: set[str]) -> "Dataset":
+    def _narrow(self, keep_slugs: set[str]) -> Dataset:
         return Dataset(
             [r for r in self.regattas if r.slug in keep_slugs],
             [r for r in self.results if r.regatta_slug in keep_slugs],
@@ -124,17 +151,19 @@ class Dataset:
             [s for s in self.sailor_races if s.regatta_slug in keep_slugs],
         )
 
-    def fleet(self) -> "Dataset":
+    def fleet(self) -> Dataset:
         """Only fleet-racing regattas (scoring_type != 'team')."""
-        return self._narrow({r.slug for r in self.regattas
-                             if getattr(r, "scoring_type", "") != "team"})
+        return self._narrow(
+            {r.slug for r in self.regattas if getattr(r, "scoring_type", "") != "team"}
+        )
 
-    def team(self) -> "Dataset":
+    def team(self) -> Dataset:
         """Only team-racing regattas."""
-        return self._narrow({r.slug for r in self.regattas
-                             if getattr(r, "scoring_type", "") == "team"})
+        return self._narrow(
+            {r.slug for r in self.regattas if getattr(r, "scoring_type", "") == "team"}
+        )
 
-    def school(self, slug: str) -> "Dataset":
+    def school(self, slug: str) -> Dataset:
         """Narrow every projection to one school (regattas it appeared in)."""
         keep = {r.regatta_slug for r in self.results if r.school_slug == slug}
         return Dataset(
@@ -144,7 +173,7 @@ class Dataset:
             [s for s in self.sailor_races if s.school_slug == slug],
         )
 
-    def sailor(self, slug: str) -> "Dataset":
+    def sailor(self, slug: str) -> Dataset:
         """Narrow to one sailor's races (and the regattas they sailed)."""
         rows = [s for s in self.sailor_races if s.sailor_slug == slug]
         keep = {s.regatta_slug for s in rows}
@@ -159,22 +188,29 @@ class Dataset:
     def results_frame(self):
         """``results`` as a pandas DataFrame (requires pandas)."""
         import pandas as pd
+
         return pd.DataFrame([vars(r) for r in self.results])
 
     def sailor_races_frame(self):
         """``sailor_races`` as a pandas DataFrame (requires pandas)."""
         import pandas as pd
+
         return pd.DataFrame([vars(s) for s in self.sailor_races])
 
     def finishes_frame(self):
         """``finishes`` as a pandas DataFrame (requires pandas)."""
         import pandas as pd
+
         return pd.DataFrame([vars(f) for f in self.finishes])
 
 
 def _load_regatta(
-    client: "Client", season: str, slug: str, refresh: bool, build_sailors: bool,
-) -> tuple[Optional[Regatta], list[SailorRaceFinish], Optional[RegattaMeta]]:
+    client: Client,
+    season: str,
+    slug: str,
+    refresh: bool,
+    build_sailors: bool,
+) -> tuple[Regatta | None, list[SailorRaceFinish], RegattaMeta | None]:
     """Fetch + assemble one regatta and (if ``build_sailors``) its sailor rows.
 
     Returns ``(regatta_or_None, sailor_rows, meta_or_None)``. The regatta is
@@ -196,8 +232,9 @@ def _load_regatta(
         if build_sailors and meta.has_sailors_page:
             srh = client.fetch(urls.sailors(season, slug), refresh=refresh, missing_ok=True)
             if srh:
-                rows = _team_sailor_races(all_html, srh, season=season, slug=slug,
-                                          sailor_links=meta.sailor_links)
+                rows = _team_sailor_races(
+                    all_html, srh, season=season, slug=slug, sailor_links=meta.sailor_links
+                )
         return reg, rows, meta
 
     fs = client.fetch(urls.full_scores(season, slug), refresh=refresh, missing_ok=True)
@@ -214,7 +251,7 @@ def _load_regatta(
     return fleet, rows, meta
 
 
-def _collect(refs, client: "Client", refresh: bool, build_sailors: bool) -> Dataset:
+def _collect(refs, client: Client, refresh: bool, build_sailors: bool) -> Dataset:
     regattas: list[Regatta] = []
     sailor_rows: list[SailorRaceFinish] = []
     metas: dict[str, RegattaMeta] = {}
@@ -229,10 +266,10 @@ def _collect(refs, client: "Client", refresh: bool, build_sailors: bool) -> Data
 
 
 def load(
-    seasons: Union[str, list[str]],
+    seasons: str | list[str],
     *,
-    only: Optional[list[str]] = None,
-    client: Optional["Client"] = None,
+    only: list[str] | None = None,
+    client: Client | None = None,
     refresh: bool = False,
     sailors: bool = True,
 ) -> Dataset:
@@ -278,7 +315,7 @@ def load(
 def load_regattas(
     refs: list[tuple[str, str]],
     *,
-    client: Optional["Client"] = None,
+    client: Client | None = None,
     refresh: bool = False,
     sailors: bool = True,
 ) -> Dataset:

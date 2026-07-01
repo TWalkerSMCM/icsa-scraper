@@ -11,7 +11,6 @@ Both satisfy the ETagStore protocol defined in fetcher.py.
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 import boto3
 
@@ -32,7 +31,7 @@ class DynamoDBETagStore:
     def __init__(self, table_name: str) -> None:
         self._table = boto3.resource("dynamodb").Table(table_name)
 
-    async def get(self, url: str) -> Optional[str]:
+    async def get(self, url: str) -> str | None:
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,

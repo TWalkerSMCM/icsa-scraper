@@ -26,7 +26,6 @@ from bs4 import BeautifulSoup
 
 from scraper.parsers._soup import ensure_soup
 
-
 # Matches /schools/{slug}/...; capture group 1 is the school slug.
 _SCHOOL_RE = re.compile(r"^/schools/([^/]+)/")
 

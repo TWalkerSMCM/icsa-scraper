@@ -2,7 +2,6 @@
 
 from scraper.parsers.rotations_teams import parse_team_slugs
 
-
 # ── Fleet racing rotation table (from RotationTable.php) ─────────────────────
 
 FLEET_HTML = """
@@ -121,6 +120,7 @@ def test_team_placeholder_returns_empty():
 
 
 # ── Empty / no rotation page ─────────────────────────────────────────────────
+
 
 def test_empty_html_returns_empty():
     assert parse_team_slugs("") == []

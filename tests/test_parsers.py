@@ -2,19 +2,26 @@
 Tests for scraper/parsers/ — the shared techscore HTML parsers.
 """
 
-from scraper.parsers import full_scores, team_all_races, division as division_parser
-from scraper.parsers.metadata import extract as extract_metadata
 from bs4 import BeautifulSoup
 
 from html_fixtures import (
-    row_1div, row_a, row_b, row_c, totalrow,
-    fs_header, fs_page, div_page,
+    div_page,
+    fs_header,
+    fs_page,
+    row_1div,
+    row_a,
+    row_b,
+    row_c,
+    totalrow,
 )
-
+from scraper.parsers import division as division_parser
+from scraper.parsers import full_scores, team_all_races
+from scraper.parsers.metadata import extract as extract_metadata
 
 # ---------------------------------------------------------------------------
 # full_scores: 1-division (Format 1 — no Div. column)
 # ---------------------------------------------------------------------------
+
 
 def test_1div_basic():
     """Standard 1-div: TeamName<br/><a>School</a>, no Div. column."""
@@ -67,6 +74,7 @@ def test_1div_multi_team_same_school():
 # ---------------------------------------------------------------------------
 # full_scores: 2-division (Formats 2+3 — has Div. column)
 # ---------------------------------------------------------------------------
+
 
 def test_2div_basic():
     """Standard 2-div: divA has <a>School</a>, divB has TeamName."""
@@ -132,19 +140,24 @@ def test_3div_propagation():
 # full_scores: B fewer races than A
 # ---------------------------------------------------------------------------
 
+
 def test_b_fewer_races_than_a():
     """When division B has fewer races sailed, empty cells should produce
     score=None so the adapter can filter them out."""
     header = fs_header([1, 2, 3])
-    a_cells = ('<td></td><td>1</td>'
-               '<td><a href="/schools/navy/s26/">Navy</a></td>'
-               '<td class="strong">A</td>'
-               '<td class="right">1</td><td class="right">2</td><td class="right">3</td>'
-               '<td></td><td class="right">6</td>')
-    b_cells = ('<td></td><td></td><td>Midshipmen</td>'
-               '<td class="strong">B</td>'
-               '<td class="right">2</td><td class="right">1</td><td class="right"></td>'
-               '<td></td><td class="right">3</td>')
+    a_cells = (
+        "<td></td><td>1</td>"
+        '<td><a href="/schools/navy/s26/">Navy</a></td>'
+        '<td class="strong">A</td>'
+        '<td class="right">1</td><td class="right">2</td><td class="right">3</td>'
+        '<td></td><td class="right">6</td>'
+    )
+    b_cells = (
+        "<td></td><td></td><td>Midshipmen</td>"
+        '<td class="strong">B</td>'
+        '<td class="right">2</td><td class="right">1</td><td class="right"></td>'
+        '<td></td><td class="right">3</td>'
+    )
     rows = [
         f'<tr class="divA">{a_cells}</tr>',
         f'<tr class="divB">{b_cells}</tr>',
@@ -165,13 +178,14 @@ def test_b_fewer_races_than_a():
 # full_scores: penalty / title parsing
 # ---------------------------------------------------------------------------
 
+
 def test_penalty_score_from_title_comma():
     """Penalty score must come from title='(15, Fleet + 1)', not cell text."""
-    header = fs_header([1, 2])
     rows = [
         row_a(1, "Navy", "/schools/navy/s26/", [1, 2], 3).replace(
             '<td class="right">1</td>',
-            '<td class="right" title="(15, Fleet + 1)"><abbr>DNF</abbr></td>'),
+            '<td class="right" title="(15, Fleet + 1)"><abbr>DNF</abbr></td>',
+        ),
         row_b("Midshipmen", [1, 1], 2),
         totalrow(5),
     ]
@@ -188,7 +202,7 @@ def test_penalty_score_from_title_colon():
     rows = [
         '<tr class="divA"><td></td><td>1</td>'
         '<td><a href="/schools/navy/s26/">Navy</a></td>'
-        '<td>A</td>'
+        "<td>A</td>"
         '<td class="right" title="(7: average in division)"><abbr>BYE</abbr></td>'
         '<td></td><td class="right">7</td></tr>',
         totalrow(7),
@@ -217,7 +231,7 @@ def test_title_field_captured():
     rows = [
         '<tr class="divA"><td></td><td>1</td>'
         '<td><a href="/schools/navy/s26/">Navy</a></td>'
-        '<td>A</td>'
+        "<td>A</td>"
         '<td class="right" title="(15, Fleet + 1)"><abbr>DNF</abbr></td>'
         '<td></td><td class="right">15</td></tr>',
         totalrow(15),
@@ -230,16 +244,17 @@ def test_title_field_captured():
 # full_scores: singlehanded layout
 # ---------------------------------------------------------------------------
 
+
 def test_singlehanded_extracts_school_not_sailor():
     """Singlehanded cells have sailor <a> then school <a>.
     Parser must extract school_url from the /schools/ link."""
     header = fs_header([1, 2], has_div=False)
     rows = [
         '<tr class="divA"><td></td><td>1</td>'
-        '<td>'
+        "<td>"
         '<span class="singlehanded-sailor-span"><a href="/sailors/john-doe/">John Doe \'27</a></span>'
         '<br/><a href="/schools/navy/s26/">Navy</a>'
-        '</td>'
+        "</td>"
         '<td class="right">1</td><td class="right">2</td>'
         '<td></td><td class="right">3</td></tr>',
         totalrow(3),
@@ -256,10 +271,10 @@ def test_singlehanded_school_id():
     header = fs_header([1], has_div=False)
     rows = [
         '<tr class="divA"><td></td><td>1</td>'
-        '<td>'
+        "<td>"
         '<span class="singlehanded-sailor-span"><a href="/sailors/jane/">Jane</a></span>'
         '<br/><a href="/schools/mit/s26/">MIT</a>'
-        '</td>'
+        "</td>"
         '<td class="right">1</td>'
         '<td></td><td class="right">1</td></tr>',
         totalrow(1),
@@ -271,6 +286,7 @@ def test_singlehanded_school_id():
 # ---------------------------------------------------------------------------
 # full_scores: totalrow skipped
 # ---------------------------------------------------------------------------
+
 
 def test_totalrow_not_in_results():
     """The totalrow (cumulative sums) must be skipped entirely."""
@@ -289,6 +305,7 @@ def test_totalrow_not_in_results():
 # ---------------------------------------------------------------------------
 # team_all_races: _parse_places (Bug 9)
 # ---------------------------------------------------------------------------
+
 
 def test_parse_places_clean():
     """Clean finish: '2-4-6' → places=[2,4,6], penalties=['','','']."""
@@ -331,6 +348,7 @@ def test_parse_places_empty():
 # team_all_races: round detection
 # ---------------------------------------------------------------------------
 
+
 def test_round_headers_detected():
     """Round headers with class='roundrow' create RoundInfo entries."""
     html = """<html><body>
@@ -366,6 +384,7 @@ def test_round_headers_detected():
 # ---------------------------------------------------------------------------
 # team_all_races: winner detection
 # ---------------------------------------------------------------------------
+
 
 def test_winner_detection():
     """tr-win class on team cell indicates winner."""
@@ -413,6 +432,7 @@ def test_unsailed_match_no_winner():
 # metadata: scoring_type detection
 # ---------------------------------------------------------------------------
 
+
 def test_scoring_type_divisional():
     html = """<html><body>
 <ul id="page-info"><li>
@@ -449,14 +469,28 @@ def test_scoring_type_default():
 # division parser
 # ---------------------------------------------------------------------------
 
+
 def test_division_basic():
     """Basic division page: ranks, school slugs, totals."""
-    html = div_page("A", [
-        {"rank": 1, "school": "Navy", "school_url": "/schools/navy/s26/",
-         "race_scores": [], "total": 12},
-        {"rank": 2, "school": "MIT", "school_url": "/schools/mit/s26/",
-         "race_scores": [], "total": 18},
-    ])
+    html = div_page(
+        "A",
+        [
+            {
+                "rank": 1,
+                "school": "Navy",
+                "school_url": "/schools/navy/s26/",
+                "race_scores": [],
+                "total": 12,
+            },
+            {
+                "rank": 2,
+                "school": "MIT",
+                "school_url": "/schools/mit/s26/",
+                "race_scores": [],
+                "total": 18,
+            },
+        ],
+    )
     results = division_parser.parse(html, "A")
     assert len(results) == 2
     assert results[0].rank == 1
@@ -469,16 +503,36 @@ def test_division_basic():
 
 def test_division_tiebreaker():
     """Division page with tiebreaker symbols and explanations."""
-    html = div_page("A", [
-        {"rank": 1, "school": "Brown", "school_url": "/schools/brown/f22/",
-         "race_scores": [], "total": 30},
-        {"rank": 2, "school": "Coast Guard", "school_url": "/schools/coast-guard/f22/",
-         "race_scores": [], "total": 30,
-         "tb_sym": "*", "tb_note": "Head-to-head tiebreaker"},
-        {"rank": 3, "school": "Harvard", "school_url": "/schools/harvard/f22/",
-         "race_scores": [], "total": 30,
-         "tb_sym": "*", "tb_note": "Head-to-head tiebreaker"},
-    ])
+    html = div_page(
+        "A",
+        [
+            {
+                "rank": 1,
+                "school": "Brown",
+                "school_url": "/schools/brown/f22/",
+                "race_scores": [],
+                "total": 30,
+            },
+            {
+                "rank": 2,
+                "school": "Coast Guard",
+                "school_url": "/schools/coast-guard/f22/",
+                "race_scores": [],
+                "total": 30,
+                "tb_sym": "*",
+                "tb_note": "Head-to-head tiebreaker",
+            },
+            {
+                "rank": 3,
+                "school": "Harvard",
+                "school_url": "/schools/harvard/f22/",
+                "race_scores": [],
+                "total": 30,
+                "tb_sym": "*",
+                "tb_note": "Head-to-head tiebreaker",
+            },
+        ],
+    )
     results = division_parser.parse(html, "A")
     assert len(results) == 3
     assert results[0].tiebreaker == ""
@@ -491,23 +545,45 @@ def test_division_tiebreaker():
 
 def test_division_school_slug_extraction():
     """School slug extracted from <a href> in team cell."""
-    html = div_page("B", [
-        {"rank": 1, "school": "U. S. Coast Guard Academy",
-         "school_url": "/schools/coast-guard/f22/",
-         "race_scores": [], "total": 10},
-    ])
+    html = div_page(
+        "B",
+        [
+            {
+                "rank": 1,
+                "school": "U. S. Coast Guard Academy",
+                "school_url": "/schools/coast-guard/f22/",
+                "race_scores": [],
+                "total": 10,
+            },
+        ],
+    )
     results = division_parser.parse(html, "B")
     assert results[0].school_slug == "coast-guard"
 
 
 def test_division_multi_team_per_school():
     """Multiple teams from the same school get separate results."""
-    html = div_page("A", [
-        {"rank": 1, "school": "Tennessee", "school_url": "/schools/tennessee/s26/",
-         "team_name": "Volunteers", "race_scores": [], "total": 10},
-        {"rank": 2, "school": "Tennessee", "school_url": "/schools/tennessee/s26/",
-         "team_name": "Smokies", "race_scores": [], "total": 20},
-    ])
+    html = div_page(
+        "A",
+        [
+            {
+                "rank": 1,
+                "school": "Tennessee",
+                "school_url": "/schools/tennessee/s26/",
+                "team_name": "Volunteers",
+                "race_scores": [],
+                "total": 10,
+            },
+            {
+                "rank": 2,
+                "school": "Tennessee",
+                "school_url": "/schools/tennessee/s26/",
+                "team_name": "Smokies",
+                "race_scores": [],
+                "total": 20,
+            },
+        ],
+    )
     results = division_parser.parse(html, "A")
     assert len(results) == 2
     assert results[0].school_slug == "tennessee"
@@ -516,34 +592,80 @@ def test_division_multi_team_per_school():
 
 def test_division_penalty():
     """Penalty column is captured."""
-    html = div_page("A", [
-        {"rank": 1, "school": "Navy", "school_url": "/schools/navy/s26/",
-         "race_scores": [], "total": 15, "penalty": "MRP"},
-    ])
+    html = div_page(
+        "A",
+        [
+            {
+                "rank": 1,
+                "school": "Navy",
+                "school_url": "/schools/navy/s26/",
+                "race_scores": [],
+                "total": 15,
+                "penalty": "MRP",
+            },
+        ],
+    )
     results = division_parser.parse(html, "A")
     assert results[0].penalty == "MRP"
 
 
 def test_division_multiple_tiebreaker_types():
     """Different tiebreaker explanations produce different symbols."""
-    html = div_page("A", [
-        {"rank": 1, "school": "Navy", "school_url": "/schools/navy/s26/",
-         "race_scores": [], "total": 20},
-        {"rank": 2, "school": "MIT", "school_url": "/schools/mit/s26/",
-         "race_scores": [], "total": 20,
-         "tb_sym": "*", "tb_note": "Head-to-head tiebreaker"},
-        {"rank": 3, "school": "Brown", "school_url": "/schools/brown/s26/",
-         "race_scores": [], "total": 20,
-         "tb_sym": "*", "tb_note": "Head-to-head tiebreaker"},
-        {"rank": 4, "school": "Yale", "school_url": "/schools/yale/s26/",
-         "race_scores": [], "total": 25},
-        {"rank": 5, "school": "Harvard", "school_url": "/schools/harvard/s26/",
-         "race_scores": [], "total": 25,
-         "tb_sym": "**", "tb_note": "Number of high-place (1) finishes"},
-        {"rank": 6, "school": "Tufts", "school_url": "/schools/tufts/s26/",
-         "race_scores": [], "total": 25,
-         "tb_sym": "**", "tb_note": "Number of high-place (1) finishes"},
-    ])
+    html = div_page(
+        "A",
+        [
+            {
+                "rank": 1,
+                "school": "Navy",
+                "school_url": "/schools/navy/s26/",
+                "race_scores": [],
+                "total": 20,
+            },
+            {
+                "rank": 2,
+                "school": "MIT",
+                "school_url": "/schools/mit/s26/",
+                "race_scores": [],
+                "total": 20,
+                "tb_sym": "*",
+                "tb_note": "Head-to-head tiebreaker",
+            },
+            {
+                "rank": 3,
+                "school": "Brown",
+                "school_url": "/schools/brown/s26/",
+                "race_scores": [],
+                "total": 20,
+                "tb_sym": "*",
+                "tb_note": "Head-to-head tiebreaker",
+            },
+            {
+                "rank": 4,
+                "school": "Yale",
+                "school_url": "/schools/yale/s26/",
+                "race_scores": [],
+                "total": 25,
+            },
+            {
+                "rank": 5,
+                "school": "Harvard",
+                "school_url": "/schools/harvard/s26/",
+                "race_scores": [],
+                "total": 25,
+                "tb_sym": "**",
+                "tb_note": "Number of high-place (1) finishes",
+            },
+            {
+                "rank": 6,
+                "school": "Tufts",
+                "school_url": "/schools/tufts/s26/",
+                "race_scores": [],
+                "total": 25,
+                "tb_sym": "**",
+                "tb_note": "Number of high-place (1) finishes",
+            },
+        ],
+    )
     results = division_parser.parse(html, "A")
     assert results[1].tiebreaker == "*"
     assert results[4].tiebreaker == "**"

@@ -1,4 +1,4 @@
-from scraper import urls, ids
+from scraper import ids, urls
 
 
 def test_urls_paths():
@@ -16,7 +16,7 @@ def test_urls_paths():
 def test_school_slug():
     assert ids.school_slug("/schools/navy/s26/") == "navy"
     assert ids.school_slug("/schools/st-marys/f25/") == "st-marys"
-    assert ids.school_slug("/navy/s26/") == "navy"          # bare form
+    assert ids.school_slug("/navy/s26/") == "navy"  # bare form
     assert ids.school_slug("/not-a-school") == ""
 
 

@@ -35,13 +35,13 @@ _PLACE_RE = re.compile(r"(\d+)\s*/\s*(\d+)(?:\s*\(([A-D])\s*Div\))?")
 @dataclass
 class SailorParticipation:
     season: str
-    slug: str               # regatta slug
+    slug: str  # regatta slug
     regatta_name: str
     host: str
-    date: str               # ISO "YYYY-MM-DD" (or raw text if no datetime attr)
-    roles: str              # "Skipper" / "Crew" / "Skipper, Crew" / "Reserve"
-    division: str           # "A".."D", or "" for combined/team/overall
-    place: int | None       # finishing rank; None if not yet placed
+    date: str  # ISO "YYYY-MM-DD" (or raw text if no datetime attr)
+    roles: str  # "Skipper" / "Crew" / "Skipper, Crew" / "Reserve"
+    division: str  # "A".."D", or "" for combined/team/overall
+    place: int | None  # finishing rank; None if not yet placed
     fleet_size: int | None
 
 
@@ -80,11 +80,19 @@ def parse(html: str | BeautifulSoup) -> list[SailorParticipation]:
                 placements = [("", None, None)]
 
             for division, place, fleet in placements:
-                out.append(SailorParticipation(
-                    season=season, slug=slug, regatta_name=regatta_name, host=host,
-                    date=date, roles=roles, division=division, place=place,
-                    fleet_size=fleet,
-                ))
+                out.append(
+                    SailorParticipation(
+                        season=season,
+                        slug=slug,
+                        regatta_name=regatta_name,
+                        host=host,
+                        date=date,
+                        roles=roles,
+                        division=division,
+                        place=place,
+                        fleet_size=fleet,
+                    )
+                )
     return out
 
 

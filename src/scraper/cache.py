@@ -16,7 +16,6 @@ import re
 import time
 from pathlib import Path
 
-
 _cache_override = os.environ.get("SCRAPER_CACHE_DIR")
 CACHE_DIR: Path = Path(_cache_override) if _cache_override else Path.cwd() / ".scraper_cache"
 

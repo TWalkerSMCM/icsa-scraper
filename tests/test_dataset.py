@@ -1,33 +1,67 @@
-from scraper.models import RegattaScores, TeamResult, DivisionResult, RaceScore
-from scraper.models import TeamRegattaScores, TeamRaceTeam
-from scraper.views import SailorRaceFinish
 from scraper.dataset import Dataset
+from scraper.models import (
+    DivisionResult,
+    RaceScore,
+    RegattaScores,
+    TeamRaceTeam,
+    TeamRegattaScores,
+    TeamResult,
+)
+from scraper.views import SailorRaceFinish
 
 
 def _fleet_regatta():
     def team(place, school):
-        div = DivisionResult(total=10, races=[RaceScore(race_num=1, points=place),
-                                              RaceScore(race_num=2, points=place)])
-        return TeamResult(place=place, school=school.title(), school_short=school,
-                          school_slug=school, school_url=f"/schools/{school}/s26/",
-                          team_name=school.title(), total=place * 10,
-                          divisions={"A": div})
+        div = DivisionResult(
+            total=10,
+            races=[RaceScore(race_num=1, points=place), RaceScore(race_num=2, points=place)],
+        )
+        return TeamResult(
+            place=place,
+            school=school.title(),
+            school_short=school,
+            school_slug=school,
+            school_url=f"/schools/{school}/s26/",
+            team_name=school.title(),
+            total=place * 10,
+            divisions={"A": div},
+        )
+
     return RegattaScores(
-        name="Test Fleet", season="s26", slug="test-fleet", scoring_type="divisional",
-        races_sailed={"A": 2}, is_final=True, regatta_start="2026-05-01",
+        name="Test Fleet",
+        season="s26",
+        slug="test-fleet",
+        scoring_type="divisional",
+        races_sailed={"A": 2},
+        is_final=True,
+        regatta_start="2026-05-01",
         teams=[team(1, "navy"), team(2, "yale")],
     )
 
 
 def _team_regatta():
     def team(place, school):
-        return TeamRaceTeam(place=place, school=school.title(), school_short=school,
-                            school_slug=school, school_url=f"/schools/{school}/s26/",
-                            team_name=school.title(), total_wins=5, total_losses=1,
-                            total_ties=0, win_pct=0.83, rounds=[])
+        return TeamRaceTeam(
+            place=place,
+            school=school.title(),
+            school_short=school,
+            school_slug=school,
+            school_url=f"/schools/{school}/s26/",
+            team_name=school.title(),
+            total_wins=5,
+            total_losses=1,
+            total_ties=0,
+            win_pct=0.83,
+            rounds=[],
+        )
+
     return TeamRegattaScores(
-        name="Test Team", season="s26", slug="test-team", scoring_type="team",
-        is_final=True, regatta_start="2026-05-02",
+        name="Test Team",
+        season="s26",
+        slug="test-team",
+        scoring_type="team",
+        is_final=True,
+        regatta_start="2026-05-02",
         teams=[team(1, "harvard"), team(2, "navy")],
     )
 
@@ -35,12 +69,15 @@ def _team_regatta():
 def _dataset():
     regs = [_fleet_regatta(), _team_regatta()]
     srs = [
-        SailorRaceFinish("s26", "test-fleet", "jane-doe", "Jane Doe", "navy", "Navy",
-                         "A", 1, 1, "skipper"),
-        SailorRaceFinish("s26", "test-fleet", "jane-doe", "Jane Doe", "navy", "Navy",
-                         "A", 2, 1, "skipper"),
-        SailorRaceFinish("s26", "test-fleet", "bob-roe", "Bob Roe", "yale", "Yale",
-                         "A", 1, 2, "skipper"),
+        SailorRaceFinish(
+            "s26", "test-fleet", "jane-doe", "Jane Doe", "navy", "Navy", "A", 1, 1, "skipper"
+        ),
+        SailorRaceFinish(
+            "s26", "test-fleet", "jane-doe", "Jane Doe", "navy", "Navy", "A", 2, 1, "skipper"
+        ),
+        SailorRaceFinish(
+            "s26", "test-fleet", "bob-roe", "Bob Roe", "yale", "Yale", "A", 1, 2, "skipper"
+        ),
     ]
     return Dataset.from_regattas(regs, srs)
 
@@ -48,8 +85,8 @@ def _dataset():
 def test_projections():
     d = _dataset()
     assert len(d) == 2
-    assert len(d.results) == 4                 # 2 fleet + 2 team teams
-    assert len(d.finishes) == 4                # 2 fleet teams x 2 races (team racing has none)
+    assert len(d.results) == 4  # 2 fleet + 2 team teams
+    assert len(d.finishes) == 4  # 2 fleet teams x 2 races (team racing has none)
     assert len(d.sailor_races) == 3
     # team results carry place, total 0
     team_res = [r for r in d.results if r.scoring_type == "team"]
@@ -71,7 +108,7 @@ def test_fleet_team_filters():
     assert d.fleet().regattas[0].slug == "test-fleet"
     # filters narrow projections too
     assert all(f.regatta_slug == "test-fleet" for f in d.fleet().finishes)
-    assert d.team().sailor_races == []          # no team sailor-races in fixture
+    assert d.team().sailor_races == []  # no team sailor-races in fixture
 
 
 def test_school_and_sailor_filters():

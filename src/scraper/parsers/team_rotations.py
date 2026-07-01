@@ -46,7 +46,6 @@ from bs4 import BeautifulSoup
 
 from scraper.parsers._soup import ensure_soup
 
-
 # Matches flight headers like "Flight 3"; capture group 1 is the flight number.
 _FLIGHT_RE = re.compile(r"Flight\s+(\d+)", re.IGNORECASE)
 

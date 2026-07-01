@@ -9,18 +9,16 @@ poller; keep the two in sync.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from bs4 import BeautifulSoup
 
-from scraper.parsers._soup import ensure_soup
-from scraper.parsers import full_scores as _full_scores
-from scraper.parsers import division as _division
-from scraper.parsers import team_all_races as _team_all_races
-from scraper.parsers import team_rotations as _team_rotations
-from scraper.parsers.regatta import parse_team_ranking_table
 from scraper.adapter import build_fleet_scores, build_team_scores
 from scraper.models import RegattaScores, TeamRegattaScores
+from scraper.parsers import division as _division
+from scraper.parsers import full_scores as _full_scores
+from scraper.parsers import team_all_races as _team_all_races
+from scraper.parsers import team_rotations as _team_rotations
+from scraper.parsers._soup import ensure_soup
+from scraper.parsers.regatta import parse_team_ranking_table
 
 
 def fleet_scores(
@@ -28,7 +26,7 @@ def fleet_scores(
     season: str,
     slug: str,
     *,
-    division_html: Optional[dict[str, str]] = None,
+    division_html: dict[str, str] | None = None,
 ) -> RegattaScores:
     """Assemble a fleet-racing regatta from its ``/full-scores/`` HTML.
 
@@ -46,7 +44,7 @@ def fleet_scores(
     soup = ensure_soup(html)
     div_scores = _full_scores.parse(soup)
 
-    division_ranks: Optional[dict[str, dict[str, int]]] = None
+    division_ranks: dict[str, dict[str, int]] | None = None
     if division_html:
         division_ranks = {}
         for div, dhtml in division_html.items():

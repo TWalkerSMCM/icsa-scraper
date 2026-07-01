@@ -105,7 +105,7 @@ class Client:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "Client":
+    def __enter__(self) -> Client:
         return self
 
     def __exit__(self, *exc: object) -> None:

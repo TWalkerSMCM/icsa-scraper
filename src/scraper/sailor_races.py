@@ -13,16 +13,15 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from typing import Optional
 
 from bs4 import BeautifulSoup
 
 from scraper import ids
-from scraper.parsers._soup import ensure_soup
 from scraper.parsers import full_scores as _full_scores
 from scraper.parsers import sailors as _sailors
 from scraper.parsers import team_all_races as _team_all_races
 from scraper.parsers import team_sailors as _team_sailors
+from scraper.parsers._soup import ensure_soup
 from scraper.parsers.full_scores import TeamDivScore
 from scraper.parsers.sailors import RpEntry
 from scraper.parsers.team_all_races import RoundInfo, TeamRaceResult
@@ -30,7 +29,7 @@ from scraper.parsers.team_sailors import MatchupRP
 from scraper.views import SailorRaceFinish
 
 
-def _sailor_slug(name: str, sailor_links: Optional[dict[str, str]]) -> str:
+def _sailor_slug(name: str, sailor_links: dict[str, str] | None) -> str:
     """Canonical sailor slug: prefer the profile link, else synthesize from name."""
     if sailor_links and name in sailor_links:
         s = ids.sailor_slug(sailor_links[name])
@@ -42,6 +41,7 @@ def _sailor_slug(name: str, sailor_links: Optional[dict[str, str]]) -> str:
 
 
 # ── fleet ──────────────────────────────────────────────────────────────────────
+
 
 def sailor_races(
     full_scores_html: str | BeautifulSoup,
@@ -102,12 +102,20 @@ def _join_fleet(
             places = {rs.race_num: rs.score for rs in td.race_scores if rs.score is not None}
             for rn in ids.expand_races(e.races, sorted(places)):
                 if rn in places:
-                    out.append(SailorRaceFinish(
-                        season=season, regatta_slug=slug,
-                        sailor_slug=ids.sailor_slug(e.sailor_url), sailor_name=e.sailor_name,
-                        school_slug=sslug, team_name=e.team_name, division=e.division,
-                        race_num=rn, place=places[rn], boat_role=e.boat_role,
-                    ))
+                    out.append(
+                        SailorRaceFinish(
+                            season=season,
+                            regatta_slug=slug,
+                            sailor_slug=ids.sailor_slug(e.sailor_url),
+                            sailor_name=e.sailor_name,
+                            school_slug=sslug,
+                            team_name=e.team_name,
+                            division=e.division,
+                            race_num=rn,
+                            place=places[rn],
+                            boat_role=e.boat_role,
+                        )
+                    )
     else:
         # Singlehanded: RP synthesized from full-scores rows (one skipper/team).
         for ds in div_scores:
@@ -117,17 +125,25 @@ def _join_fleet(
             for rs in ds.race_scores:
                 if rs.score is None:
                     continue
-                out.append(SailorRaceFinish(
-                    season=season, regatta_slug=slug,
-                    sailor_slug=ids.sailor_slug(ds.sailor_url), sailor_name=ds.sailor_name,
-                    school_slug=sslug, team_name=ds.team_name or ds.school_name,
-                    division=ds.division, race_num=rs.race_num, place=rs.score,
-                    boat_role="skipper",
-                ))
+                out.append(
+                    SailorRaceFinish(
+                        season=season,
+                        regatta_slug=slug,
+                        sailor_slug=ids.sailor_slug(ds.sailor_url),
+                        sailor_name=ds.sailor_name,
+                        school_slug=sslug,
+                        team_name=ds.team_name or ds.school_name,
+                        division=ds.division,
+                        race_num=rs.race_num,
+                        place=rs.score,
+                        boat_role="skipper",
+                    )
+                )
     return out
 
 
 # ── team racing ────────────────────────────────────────────────────────────────
+
 
 def team_sailor_races(
     all_html: str | BeautifulSoup,
@@ -135,7 +151,7 @@ def team_sailor_races(
     *,
     season: str = "",
     slug: str = "",
-    sailor_links: Optional[dict[str, str]] = None,
+    sailor_links: dict[str, str] | None = None,
 ) -> list[SailorRaceFinish]:
     """Join team-racing RP to per-race earned positions.
 
@@ -166,7 +182,7 @@ def _join_team(
     matchups: list[MatchupRP],
     season: str,
     slug: str,
-    sailor_links: Optional[dict[str, str]],
+    sailor_links: dict[str, str] | None,
 ) -> list[SailorRaceFinish]:
     """Pure join of team RP to earned positions (see ``team_sailor_races``)."""
     if not matchups or not results:
@@ -176,18 +192,20 @@ def _join_team(
     slug_by_mascot: dict[str, str] = {}
     all_slugs: set[str] = set()
     for r in results:
-        for url, mascot in ((r.team1_school_url, r.team1_team_name),
-                            (r.team2_school_url, r.team2_team_name)):
+        for url, mascot in (
+            (r.team1_school_url, r.team1_team_name),
+            (r.team2_school_url, r.team2_team_name),
+        ):
             s = ids.school_slug(url)
             if s:
                 all_slugs.add(s)
                 if mascot:
                     slug_by_mascot[mascot] = s
 
-    def resolve(label: str) -> Optional[str]:
+    def resolve(label: str) -> str | None:
         if label in slug_by_mascot:
             return slug_by_mascot[label]
-        parts = label.rsplit(" ", 1)          # "Bentley Falcons" -> "Falcons"
+        parts = label.rsplit(" ", 1)  # "Bentley Falcons" -> "Falcons"
         if len(parts) == 2 and parts[1] in slug_by_mascot:
             return slug_by_mascot[parts[1]]
         for mascot, s in slug_by_mascot.items():
@@ -226,10 +244,18 @@ def _join_team(
                 for role, name in (("skipper", boat.skipper_name), ("crew", boat.crew_name)):
                     if not name:
                         continue
-                    out.append(SailorRaceFinish(
-                        season=season, regatta_slug=slug,
-                        sailor_slug=_sailor_slug(name, sailor_links), sailor_name=name,
-                        school_slug=tslug, team_name=m.team_name, division=boat.division,
-                        race_num=r.race_number, place=place, boat_role=role,
-                    ))
+                    out.append(
+                        SailorRaceFinish(
+                            season=season,
+                            regatta_slug=slug,
+                            sailor_slug=_sailor_slug(name, sailor_links),
+                            sailor_name=name,
+                            school_slug=tslug,
+                            team_name=m.team_name,
+                            division=boat.division,
+                            race_num=r.race_number,
+                            place=place,
+                            boat_role=role,
+                        )
+                    )
     return out

@@ -57,7 +57,7 @@ def split_sailor_name(full_name: str) -> tuple[str, str, int | None, bool]:
         yy = int(m.group(1))
         # 00-49 → 2000-2049, 50-99 → 1950-1999
         grad_year = 2000 + yy if yy < 50 else 1900 + yy
-        name = name[:m.start()].strip()
+        name = name[: m.start()].strip()
     else:
         # Strip " '??" (unknown year)
         name = re.sub(r"\s+'\?\?$", "", name).strip()

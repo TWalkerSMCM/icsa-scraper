@@ -5,8 +5,9 @@ Extracts a list of regatta stubs: nick, name, date string, and URL path.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+
 import re
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
 
@@ -15,12 +16,12 @@ from scraper.parsers._soup import ensure_soup
 
 @dataclass
 class RegattaStub:
-    nick: str        # URL slug, e.g. "spring-championship"
-    name: str        # Display name
-    season: str      # Season URL key, e.g. "s25"
-    path: str        # Full path, e.g. "/s25/spring-championship/"
-    date_str: str    # Raw date text from page, e.g. "March 1–2"
-    status: str      # e.g. "final", "scheduled", etc. (from class or text)
+    nick: str  # URL slug, e.g. "spring-championship"
+    name: str  # Display name
+    season: str  # Season URL key, e.g. "s25"
+    path: str  # Full path, e.g. "/s25/spring-championship/"
+    date_str: str  # Raw date text from page, e.g. "March 1–2"
+    status: str  # e.g. "final", "scheduled", etc. (from class or text)
 
 
 def parse(html: str | BeautifulSoup, season: str) -> list[RegattaStub]:
@@ -58,14 +59,16 @@ def parse(html: str | BeautifulSoup, season: str) -> list[RegattaStub]:
         path = f"/{season}/{nick}/"
         date_str = _find_nearby_date(a)
 
-        regattas.append(RegattaStub(
-            nick=nick,
-            name=name,
-            season=season,
-            path=path,
-            date_str=date_str,
-            status="",
-        ))
+        regattas.append(
+            RegattaStub(
+                nick=nick,
+                name=name,
+                season=season,
+                path=path,
+                date_str=date_str,
+                status="",
+            )
+        )
 
     return regattas
 

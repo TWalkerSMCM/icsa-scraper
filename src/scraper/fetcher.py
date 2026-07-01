@@ -20,42 +20,43 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional, Protocol, Union, runtime_checkable
+from typing import Protocol, runtime_checkable
 
-from bs4 import BeautifulSoup
 import httpx
+from bs4 import BeautifulSoup
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
 )
 
-from .models import RegattaListEntry, RegattaScores, TeamRegattaScores, make_pk
+from .adapter import build_fleet_scores, build_team_scores
 from .live.front_page import parse_active_regattas
+from .models import RegattaListEntry, RegattaScores, TeamRegattaScores, make_pk
 from .parsers.division import parse as _parse_division
 from .parsers.full_scores import parse as _parse_full_scores_raw
+from .parsers.regatta import parse_team_ranking_table
 from .parsers.team_all_races import parse as _parse_team_all_raw
 from .parsers.team_rotations import parse_flights as _parse_team_flights
-from .parsers.regatta import parse_team_ranking_table
-from .adapter import build_fleet_scores, build_team_scores
 
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://scores.collegesailing.org"
 USER_AGENT = "ICSA-LiveScores/1.0 (contact: icsa-app)"
 
-ScoreResult = Union[RegattaScores, TeamRegattaScores]
+ScoreResult = RegattaScores | TeamRegattaScores
 
 
 # ---------------------------------------------------------------------------
 # ETag store — swappable interface
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class ETagStore(Protocol):
-    async def get(self, url: str) -> Optional[str]: ...
+    async def get(self, url: str) -> str | None: ...
     async def set(self, url: str, etag: str) -> None: ...
 
 
@@ -63,7 +64,7 @@ class InMemoryETagStore:
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
 
-    async def get(self, url: str) -> Optional[str]:
+    async def get(self, url: str) -> str | None:
         return self._store.get(url)
 
     async def set(self, url: str, etag: str) -> None:
@@ -74,6 +75,7 @@ class InMemoryETagStore:
 # Retry predicate
 # ---------------------------------------------------------------------------
 
+
 def _is_transient(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code not in (404, 410, 403, 401)
@@ -83,6 +85,7 @@ def _is_transient(exc: BaseException) -> bool:
 # ---------------------------------------------------------------------------
 # Fetcher
 # ---------------------------------------------------------------------------
+
 
 class ICSAFetcher:
     """
@@ -98,7 +101,7 @@ class ICSAFetcher:
 
     def __init__(
         self,
-        etag_store: Optional[ETagStore] = None,
+        etag_store: ETagStore | None = None,
         max_concurrent: int = 50,
         timeout: float = 15.0,
         ignore_etags: bool = False,
@@ -106,10 +109,10 @@ class ICSAFetcher:
         self._etag_store = etag_store or InMemoryETagStore()
         self._ignore_etags = ignore_etags
         self._semaphore = asyncio.Semaphore(max_concurrent)
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._timeout = timeout
 
-    async def __aenter__(self) -> "ICSAFetcher":
+    async def __aenter__(self) -> ICSAFetcher:
         self._client = httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT},
             timeout=self._timeout,
@@ -127,8 +130,11 @@ class ICSAFetcher:
     # ------------------------------------------------------------------
 
     async def _fetch(
-        self, url: str, *, bypass_etag: bool = False,
-    ) -> tuple[Optional[str], Optional[str]]:
+        self,
+        url: str,
+        *,
+        bypass_etag: bool = False,
+    ) -> tuple[str | None, str | None]:
         """
         Fetch a URL with conditional GET.
 
@@ -186,7 +192,7 @@ class ICSAFetcher:
         assert self._client is not None, "Use ICSAFetcher as an async context manager"
         resp = await self._client.get(f"{BASE_URL}/")
         resp.raise_for_status()
-        log.info("HTTP Request: GET %s/ \"%s\"", BASE_URL, resp.status_code)
+        log.info('HTTP Request: GET %s/ "%s"', BASE_URL, resp.status_code)
         return parse_active_regattas(resp.text), resp.text
 
     async def _fill_division_ranks_if_tied(
@@ -198,10 +204,7 @@ class ICSAFetcher:
             for div_key, div in team.divisions.items():
                 div_totals.setdefault(div_key, []).append(div.total)
 
-        tied_divs = [
-            dk for dk, totals in div_totals.items()
-            if len(totals) != len(set(totals))
-        ]
+        tied_divs = [dk for dk, totals in div_totals.items() if len(totals) != len(set(totals))]
         if not tied_divs:
             return
 
@@ -244,7 +247,7 @@ class ICSAFetcher:
                     team.divisions[div_key].tiebreaker_note = tb_note
                 slug_counts[team.school_slug] = occ + 1
 
-    async def _fetch_team_rankings(self, season: str, slug: str) -> Optional[list]:
+    async def _fetch_team_rankings(self, season: str, slug: str) -> list | None:
         """Fetch and parse /full-scores/ page for official team racing rankings.
 
         ETag is bypassed: the rankings join into the /all/ result and a 304
@@ -263,7 +266,7 @@ class ICSAFetcher:
             log.warning("Failed to fetch ranking page for %s/%s", season, slug)
             return None
 
-    async def _fetch_team_flights(self, season: str, slug: str) -> Optional[dict[int, int]]:
+    async def _fetch_team_flights(self, season: str, slug: str) -> dict[int, int] | None:
         """Fetch /rotations/ and parse the flight assignment for each race.
 
         ETag is bypassed: rotations are typically published once and rarely
@@ -288,17 +291,24 @@ class ICSAFetcher:
         return build_fleet_scores(soup, season, slug, div_scores)
 
     def _parse_team(
-        self, html: str, season: str, slug: str,
-        rankings=None, flights=None,
+        self,
+        html: str,
+        season: str,
+        slug: str,
+        rankings=None,
+        flights=None,
     ) -> TeamRegattaScores:
         soup = BeautifulSoup(html, "lxml")
         rounds, results = _parse_team_all_raw(soup)
-        return build_team_scores(soup, season, slug, rounds, results,
-                                 rankings=rankings, flights=flights)
+        return build_team_scores(
+            soup, season, slug, rounds, results, rankings=rankings, flights=flights
+        )
 
     async def _fetch_and_parse_team(
-        self, season: str, slug: str,
-    ) -> tuple[Optional[ScoreResult], Optional[str]]:
+        self,
+        season: str,
+        slug: str,
+    ) -> tuple[ScoreResult | None, str | None]:
         """Fetch /all/, /full-scores/, /rotations/ concurrently, parse as team race."""
         url = f"{BASE_URL}/{season}/{slug}/all/"
         (html, _), rankings, flights = await asyncio.gather(
@@ -311,8 +321,8 @@ class ICSAFetcher:
         return self._parse_team(html, season, slug, rankings, flights), html
 
     async def fetch_scores(
-        self, season: str, slug: str, scoring_type: Optional[str] = None
-    ) -> tuple[Optional[ScoreResult], Optional[str]]:
+        self, season: str, slug: str, scoring_type: str | None = None
+    ) -> tuple[ScoreResult | None, str | None]:
         """
         Fetch and parse full scores for one regatta.
 
@@ -358,8 +368,8 @@ class ICSAFetcher:
 
     async def poll_active_scores(
         self,
-        entries: Optional[list[RegattaListEntry]] = None,
-        known_scoring_types: Optional[dict[str, str]] = None,
+        entries: list[RegattaListEntry] | None = None,
+        known_scoring_types: dict[str, str] | None = None,
     ) -> list[tuple[ScoreResult, str]]:
         """
         One full poll cycle: fetch scores for all active regattas concurrently.

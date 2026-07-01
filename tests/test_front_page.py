@@ -4,7 +4,6 @@ Tests for scraper/live/front_page.py — active and upcoming regatta parsing.
 
 from scraper.live.front_page import parse_active_regattas, parse_upcoming_regattas
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -52,6 +51,7 @@ EMPTY_HTML = "<html><body><p>No regattas</p></body></html>"
 # parse_active_regattas
 # ---------------------------------------------------------------------------
 
+
 def test_parse_active_regattas_basic():
     entries = parse_active_regattas(ACTIVE_HTML)
     assert len(entries) == 2
@@ -74,6 +74,7 @@ def test_parse_active_regattas_name():
 # ---------------------------------------------------------------------------
 # parse_upcoming_regattas
 # ---------------------------------------------------------------------------
+
 
 def test_parse_upcoming_regattas_basic():
     entries = parse_upcoming_regattas(UPCOMING_HTML)

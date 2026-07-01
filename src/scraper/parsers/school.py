@@ -10,6 +10,7 @@ Extracts the conference (e.g. "NEISA", "PCCSC") and the full school name.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
@@ -20,8 +21,8 @@ from scraper.parsers._soup import ensure_soup
 
 @dataclass
 class SchoolInfo:
-    conference: str   # e.g. "NEISA", "PCCSC"
-    full_name: str    # e.g. "Massachusetts Institute of Technology"
+    conference: str  # e.g. "NEISA", "PCCSC"
+    full_name: str  # e.g. "Massachusetts Institute of Technology"
 
 
 def parse(html: str | BeautifulSoup) -> SchoolInfo:

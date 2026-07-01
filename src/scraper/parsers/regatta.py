@@ -12,8 +12,9 @@ no inference needed.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+
 import re
+from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup, Tag
 
@@ -25,34 +26,34 @@ from scraper.parsers._soup import ensure_soup
 class TeamScore:
     rank: int
     school_name: str
-    school_url: str        # e.g. "/schools/mit/s25/"
+    school_url: str  # e.g. "/schools/mit/s25/"
     team_name: str
     division_scores: dict  # {"A": 12, "B": 8, ...}
     division_penalties: dict  # {"A": "MRP", ...}
     total: int
-    wins: int = 0          # team racing only
-    losses: int = 0        # team racing only
-    tiebreaker: str = ""         # symbol, e.g. "*"
-    tiebreaker_note: str = ""    # title text, e.g. "Head-to-head record (1-0)"
+    wins: int = 0  # team racing only
+    losses: int = 0  # team racing only
+    tiebreaker: str = ""  # symbol, e.g. "*"
+    tiebreaker_note: str = ""  # title text, e.g. "Head-to-head record (1-0)"
 
 
 @dataclass
 class RegattaMeta:
     name: str
-    season: str            # e.g. "s25"
-    nick: str              # URL slug
-    scoring: str           # "standard" | "combined" | "team"
-    participant: str       # "coed" | "women"
+    season: str  # e.g. "s25"
+    nick: str  # URL slug
+    scoring: str  # "standard" | "combined" | "team"
+    participant: str  # "coed" | "women"
     status: str
     hosts: list[str]
-    start_time: str = ""   # ISO 8601 e.g. "2025-10-25T10:00-04:00"
-    end_date: str = ""     # ISO date e.g. "2025-10-26"
-    boat: str = ""         # e.g. "FJ"
-    type: str = ""         # e.g. "Conference Championship Regatta"
+    start_time: str = ""  # ISO 8601 e.g. "2025-10-25T10:00-04:00"
+    end_date: str = ""  # ISO date e.g. "2025-10-26"
+    boat: str = ""  # e.g. "FJ"
+    type: str = ""  # e.g. "Conference Championship Regatta"
     team_scores: list[TeamScore] = field(default_factory=list)
     # Actual sub-pages linked in nav — derived from page links, not inferred
     division_pages: list[str] = field(default_factory=list)  # e.g. ["/f25/r/A/", "/f25/r/B/"]
-    has_combined_page: bool = False   # /divisions/ — combined scoring
+    has_combined_page: bool = False  # /divisions/ — combined scoring
     has_full_scores_page: bool = False
     has_sailors_page: bool = False
     has_all_races_page: bool = False  # /all/ — team racing
@@ -113,6 +114,7 @@ def parse(html: str | BeautifulSoup, season: str, nick: str) -> RegattaMeta:
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _extract_name(soup: BeautifulSoup) -> str:
     title = soup.find("title")
@@ -235,7 +237,9 @@ def _parse_fleet_table(table: Tag) -> tuple[list[TeamScore], list[str]]:
 
         school_cell = cells[3]
         school_a = school_cell.find("a")
-        school_name = school_a.get_text(strip=True) if school_a else school_cell.get_text(strip=True)
+        school_name = (
+            school_a.get_text(strip=True) if school_a else school_cell.get_text(strip=True)
+        )
         school_url = school_a.get("href", "") if school_a else ""
 
         team_name = cells[4].get_text(strip=True)
@@ -257,15 +261,17 @@ def _parse_fleet_table(table: Tag) -> tuple[list[TeamScore], list[str]]:
         except ValueError:
             total = sum(div_scores.values())
 
-        scores.append(TeamScore(
-            rank=int(rank_text),
-            school_name=school_name,
-            school_url=school_url,
-            team_name=team_name,
-            division_scores=div_scores,
-            division_penalties=div_penalties,
-            total=total,
-        ))
+        scores.append(
+            TeamScore(
+                rank=int(rank_text),
+                school_name=school_name,
+                school_url=school_url,
+                team_name=team_name,
+                division_scores=div_scores,
+                division_penalties=div_penalties,
+                total=total,
+            )
+        )
     return scores, divisions
 
 
@@ -285,7 +291,9 @@ def parse_team_ranking_table(table: Tag) -> list[TeamScore]:
             continue
         school_cell = cells[3]
         school_a = school_cell.find("a")
-        school_name = school_a.get_text(strip=True) if school_a else school_cell.get_text(strip=True)
+        school_name = (
+            school_a.get_text(strip=True) if school_a else school_cell.get_text(strip=True)
+        )
         school_url = school_a.get("href", "") if school_a else ""
         team_name = cells[4].get_text(strip=True) if len(cells) > 4 else ""
 
@@ -297,19 +305,21 @@ def parse_team_ranking_table(table: Tag) -> list[TeamScore]:
             if m:
                 wins, losses = int(m.group(1)), int(m.group(2))
 
-        scores.append(TeamScore(
-            rank=int(rank_text),
-            school_name=school_name,
-            school_url=school_url,
-            team_name=team_name,
-            division_scores={},
-            division_penalties={},
-            total=0,
-            wins=wins,
-            losses=losses,
-            tiebreaker=cells[0].get_text(strip=True),
-            tiebreaker_note=cells[0].get("title", "").strip(),
-        ))
+        scores.append(
+            TeamScore(
+                rank=int(rank_text),
+                school_name=school_name,
+                school_url=school_url,
+                team_name=team_name,
+                division_scores={},
+                division_penalties={},
+                total=0,
+                wins=wins,
+                losses=losses,
+                tiebreaker=cells[0].get_text(strip=True),
+                tiebreaker_note=cells[0].get("title", "").strip(),
+            )
+        )
     return scores
 
 

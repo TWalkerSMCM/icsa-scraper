@@ -17,8 +17,9 @@ Page structure:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+
 import re
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
 
@@ -28,18 +29,20 @@ from scraper.parsers._soup import ensure_soup
 @dataclass
 class BoatAssignment:
     """Sailor assignment for one boat (division) in one matchup."""
-    division: str            # "A", "B", "C", "D"
-    skipper_name: str        # e.g. "John O'Connell '28"
-    crew_name: str           # e.g. "Isabel Walchli '28" or ""
+
+    division: str  # "A", "B", "C", "D"
+    skipper_name: str  # e.g. "John O'Connell '28"
+    crew_name: str  # e.g. "Isabel Walchli '28" or ""
 
 
 @dataclass
 class MatchupRP:
     """Sailor assignment for one team vs one opponent in one round."""
-    round_title: str         # e.g. "Round 1", "Final Four"
-    round_order: int         # sequential
-    team_name: str           # row label, e.g. "Bentley Falcons"
-    opponent_name: str       # column header, e.g. "Brown"
+
+    round_title: str  # e.g. "Round 1", "Final Four"
+    round_order: int  # sequential
+    team_name: str  # row label, e.g. "Bentley Falcons"
+    opponent_name: str  # column header, e.g. "Brown"
     boats: list[BoatAssignment]
 
 
@@ -94,13 +97,15 @@ def parse(html: str | BeautifulSoup) -> list[MatchupRP]:
                 boats = _parse_boat_table(cell)
 
                 if boats:
-                    results.append(MatchupRP(
-                        round_title=round_title,
-                        round_order=round_order,
-                        team_name=team_name,
-                        opponent_name=opponent,
-                        boats=boats,
-                    ))
+                    results.append(
+                        MatchupRP(
+                            round_title=round_title,
+                            round_order=round_order,
+                            team_name=team_name,
+                            opponent_name=opponent,
+                            boats=boats,
+                        )
+                    )
 
                 opp_idx += 1
 
@@ -141,10 +146,12 @@ def _parse_boat_table(cell: Tag) -> list[BoatAssignment]:
         skipper = names[0] if len(names) >= 1 else ""
         crew = names[1] if len(names) >= 2 else ""
 
-        boats.append(BoatAssignment(
-            division=division,
-            skipper_name=skipper,
-            crew_name=crew,
-        ))
+        boats.append(
+            BoatAssignment(
+                division=division,
+                skipper_name=skipper,
+                crew_name=crew,
+            )
+        )
 
     return boats

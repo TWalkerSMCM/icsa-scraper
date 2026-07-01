@@ -36,17 +36,19 @@ def parse_active_regattas(html: str | BeautifulSoup) -> list[RegattaListEntry]:
 
     for a in div.select("table.season-summary tbody tr td:first-child a[href]"):
         href = a["href"]
-        m = re.match(r'^/([a-z]\d{2})/([^/]+)/?$', href)
+        m = re.match(r"^/([a-z]\d{2})/([^/]+)/?$", href)
         if not m:
             continue
         season, slug = m.group(1), m.group(2)
-        results.append(RegattaListEntry(
-            name=a.get_text(strip=True),
-            url=BASE_URL + href,
-            slug=slug,
-            season=season,
-            status="in_progress",
-        ))
+        results.append(
+            RegattaListEntry(
+                name=a.get_text(strip=True),
+                url=BASE_URL + href,
+                slug=slug,
+                season=season,
+                status="in_progress",
+            )
+        )
 
     return results
 
@@ -77,7 +79,7 @@ def parse_upcoming_regattas(html: str | BeautifulSoup) -> list[RegattaListEntry]
         if not a:
             continue
         href = a["href"]
-        m = re.match(r'^/([a-z]\d{2})/([^/]+)/?$', href)
+        m = re.match(r"^/([a-z]\d{2})/([^/]+)/?$", href)
         if not m:
             continue
 
@@ -97,15 +99,17 @@ def parse_upcoming_regattas(html: str | BeautifulSoup) -> list[RegattaListEntry]
         except ValueError:
             pass
 
-        results.append(RegattaListEntry(
-            name=a.get_text(strip=True),
-            url=BASE_URL + href,
-            slug=slug,
-            season=season,
-            status="upcoming",
-            host=host,
-            regatta_start=regatta_start,
-            scoring_type=scoring_type,
-        ))
+        results.append(
+            RegattaListEntry(
+                name=a.get_text(strip=True),
+                url=BASE_URL + href,
+                slug=slug,
+                season=season,
+                status="upcoming",
+                host=host,
+                regatta_start=regatta_start,
+                scoring_type=scoring_type,
+            )
+        )
 
     return results

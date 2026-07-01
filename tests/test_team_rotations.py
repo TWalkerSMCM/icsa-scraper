@@ -2,7 +2,6 @@
 
 from scraper.parsers.team_rotations import parse_flights
 
-
 SINGLE_TABLE_HTML = """
 <html><body>
 <table class="tr-rotation-table">
@@ -100,6 +99,7 @@ def test_grouped_rounds_keep_monotonic_flight_numbers():
 
 # ── tr-incomplete rows (placeholder team before seeding) ────────────────────
 
+
 def test_tr_incomplete_rows_still_get_flight():
     html = """
 <table class="tr-rotation-table"><tbody>
@@ -118,6 +118,7 @@ def test_tr_incomplete_rows_still_get_flight():
 
 
 # ── Round name with parens of its own (defensive) ───────────────────────────
+
 
 def test_flight_header_with_complex_round_name():
     """Round names can contain words like 'Final Four' or '(Group A)'.
@@ -147,6 +148,7 @@ def test_race_before_flight_header_is_skipped():
 
 
 # ── Edge cases ──────────────────────────────────────────────────────────────
+
 
 def test_empty_html_returns_empty():
     assert parse_flights("") == {}

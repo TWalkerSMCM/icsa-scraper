@@ -122,6 +122,9 @@ def test_school_and_sailor_filters():
 
 
 def test_frames():
+    import pytest
+
+    pytest.importorskip("pandas")
     d = _dataset()
     rf = d.results_frame()
     assert rf.shape[0] == 4 and "place" in rf.columns

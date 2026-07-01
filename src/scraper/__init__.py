@@ -1,27 +1,34 @@
 """
-icsa-scraper — HTML parsers for college sailing results.
+icsa-scraper — a parser and analysis library for college sailing results.
 
 Parses pages from scores.collegesailing.org (the ICSA Techscore system) into
-plain dataclasses. Pass in HTML you already have; the parsers do no network I/O.
+plain dataclasses, and scrapes/assembles them into a queryable ``Dataset``.
 
 Quick start::
 
-    import httpx
-    from scraper.parsers import division
+    import scraper
 
-    html = httpx.get("https://scores.collegesailing.org/s25/<regatta>/A/").text
-    results = division.parse(html, "A")   # -> list[TeamDivisionResult]
+    data = scraper.load("s26")
+    data.fleet().results_frame()   # a pandas DataFrame, one row per (regatta, school)
+
+Under the hood, ``load()`` fetches pages with ``scraper.Client`` and hands them
+to the pure ``scraper.parsers`` — those parsers do no network I/O themselves,
+so they're easy to test, cache, and call directly with HTML you already have.
 
 Layers:
   - ``scraper.parsers`` — granular per-page HTML parsers (needs beautifulsoup4)
   - ``scraper.adapter``  — groups parser output into the ``scraper.models`` API
   - ``scraper.models``   — dataclasses describing the public data contract
   - ``scraper.cache``    — optional on-disk HTML cache
+  - ``scraper.dataset``  — ``load``/``Dataset``: scrape a season into a queryable
+    in-memory collection (the analysis layer)
+  - ``scraper.head_to_head`` — compare two sailors without scraping a season
 
 Heavier, optional pieces are NOT imported here so a core install stays light:
   - ``scraper.fetcher``  — async page fetching      (install extra: ``fetch``)
   - ``scraper.stores``   — DynamoDB ETag store       (install extra: ``aws``)
-Import those modules explicitly when you need them.
+Import those modules explicitly when you need them. ``scraper.load()`` and
+``scraper.Client`` also need the ``fetch`` extra, since they fetch pages themselves.
 """
 
 from __future__ import annotations

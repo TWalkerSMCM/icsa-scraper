@@ -1,12 +1,12 @@
 # icsa-scraper
 
-HTML parsers for college sailing results from
+A parser **and analysis** library for college sailing results from
 [scores.collegesailing.org](https://scores.collegesailing.org) — the ICSA
 Techscore scoring system.
 
-The parsers are pure functions over HTML: you hand them a page's HTML and they
-return plain Python dataclasses. They do **no network I/O**, so they're easy to
-test, cache, and run anywhere (including notebooks).
+Scrape a season into a queryable `Dataset`, compare two sailors head-to-head,
+or drop down to the pure HTML parsers underneath — no network required at that
+layer.
 
 ## Install
 
@@ -26,18 +26,37 @@ The base install pulls only `beautifulsoup4` + `lxml`. Optional extras:
 
 | Extra   | Adds                  | For |
 |---------|-----------------------|-----|
-| `fetch` | `httpx`, `tenacity`   | an HTTP client (`httpx`) for fetching pages yourself, plus the async `scraper.fetcher` |
+| `fetch` | `httpx`, `tenacity`   | `scraper.Client` (sync, cached) for fetching pages, plus the async `scraper.fetcher` |
 | `aws`   | `boto3`               | the DynamoDB ETag store in `scraper.stores` |
 
 ```bash
 pip install "icsa-scraper[fetch] @ git+https://github.com/TWalkerSMCM/icsa-scraper"
 ```
 
+`scraper.load()` and `scraper.head_to_head()` need the `fetch` extra since they
+fetch pages themselves.
+
 ## Quick start
 
-The parsers don't fetch — the examples below use `httpx` for the GETs, so install
-the `fetch` extra (`pip install "icsa-scraper[fetch] @ git+..."`). Or bring your
-own client (`requests`, `urllib`) and skip the extra.
+```python
+import scraper
+
+data = scraper.load("s26")
+data.fleet().results_frame()   # one row per (regatta, school): place, total, school_slug, ...
+
+h = scraper.head_to_head("jane-doe", "john-roe")
+h.a_ahead, h.b_ahead   # regatta-divisions each sailor finished ahead in
+```
+
+See [`docs/api.md`](docs/api.md) for the full surface, or the guided tour in
+[`examples/quickstart.ipynb`](examples/quickstart.ipynb).
+
+## Lower-level layers
+
+The parsers are pure functions over HTML: hand them a page you already
+fetched and they return plain Python dataclasses — no network I/O, easy to
+test, cache, and run anywhere (including notebooks). `scraper.load()` and
+`scraper.fleet_scores()`/`scraper.team_scores()` are built on top of them.
 
 ```python
 import httpx
@@ -61,28 +80,26 @@ HTML string or a pre-parsed `BeautifulSoup`.
 
 [`examples/quickstart.ipynb`](examples/quickstart.ipynb)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/quickstart.ipynb)
-— a guided tour: assemble one regatta from its pages into a `RegattaScores`
-model, then a pandas DataFrame and a chart. Click the badge to run it in Colab.
+— a guided tour: load a season into a `Dataset`, explore it as a pandas
+DataFrame and a chart, then peek under the hood at the `Client` + parser
+layers. Click the badge to run it in Colab.
 
 ## Google Colab
 
 ```python
 !pip install -q "icsa-scraper[fetch] @ git+https://github.com/TWalkerSMCM/icsa-scraper"
 
-import httpx
-from scraper.parsers import division
+import scraper
 
-html = httpx.get("https://scores.collegesailing.org/s25/<regatta>/A/").text
-for team in division.parse(html, "A"):
-    print(team.rank, team.school_name, team.total_score)
+data = scraper.load("s26")   # workers=16 by default: regattas fetched concurrently
+data.fleet().results_frame().sort_values("place").head(10)
 ```
 
 Notes for Colab:
 
-- **Use synchronous fetching** (`httpx.get(...)` / `requests.get(...)`) as
-  above. `scraper.fetcher` is `async`, and Colab already runs an event loop, so
-  `asyncio.run()` there raises "event loop already running." If you must use the
-  async fetcher, `import nest_asyncio; nest_asyncio.apply()` first.
+- **`scraper.load` is synchronous** under the hood (`scraper.Client`), so it's
+  Colab-safe with no event-loop juggling. `scraper.fetcher` is a separate
+  `async` fetcher for the Lambda poller — you don't need it here.
 - **Persisting the disk cache:** `scraper.cache` defaults to `./.scraper_cache`,
   which Colab wipes on runtime reset. To keep it, mount Drive and point the
   cache at it:
@@ -94,7 +111,8 @@ Notes for Colab:
   os.environ["SCRAPER_CACHE_DIR"] = "/content/drive/MyDrive/icsa_cache"
   ```
 
-  Set `SCRAPER_CACHE_DIR` **before** importing `scraper.cache`.
+  Set `SCRAPER_CACHE_DIR` **before** importing `scraper` (or pass
+  `scraper.Client(cache_dir=...)` explicitly).
 
 ## Layout
 
@@ -103,8 +121,16 @@ Notes for Colab:
 | `scraper.parsers` | granular per-page HTML parsers (overview, divisions, full scores, sailors, rotations, …) |
 | `scraper.adapter` | groups parser output into the `scraper.models` data contract |
 | `scraper.models`  | dataclasses describing the public API shape |
+| `scraper.urls`    | pure functions for site-relative paths |
+| `scraper.ids`     | slug/name helpers (school/sailor slugs, race-range expansion) |
+| `scraper.client`  | `Client` — sync, cached, rate-limited HTTP fetcher (extra: `fetch`) |
+| `scraper.assemble` | `fleet_scores`/`team_scores` — one HTML-in/model-out call per regatta |
+| `scraper.sailor_races` | the RP↔finish join — per-sailor, per-race results |
+| `scraper.dataset` | `load`/`Dataset` — scrape a season into a queryable in-memory collection |
+| `scraper.head_to_head` | compare two sailors without scraping a whole season |
+| `scraper.views`   | flat, analysis-friendly row types (`Result`, `Finish`, `SailorRaceFinish`, `HeadToHead`, …) |
 | `scraper.cache`   | optional on-disk HTML cache |
-| `scraper.fetcher` | async page fetcher (extra: `fetch`) |
+| `scraper.fetcher` | async page fetcher, used by the Lambda poller (extra: `fetch`) |
 | `scraper.stores`  | DynamoDB ETag store (extra: `aws`) |
 
 ## Development

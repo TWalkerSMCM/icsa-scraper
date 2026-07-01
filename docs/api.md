@@ -40,12 +40,16 @@ Pure functions returning site-relative paths (core install, no deps).
 ```python
 Client(base_url=DEFAULT, cache_dir=None, user_agent=DEFAULT, delay=0.0, timeout=30.0)
 ```
-Owns one `httpx` session + the rate-limit clock (no module globals).
+Owns one `httpx` session + the rate-limit clock, all as instance state — no module
+globals. `cache_dir` is per-instance: two `Client`s (or a `Client` and bare
+`scraper.cache` calls) never share or clobber each other's cache location.
 
 **`client.fetch(path, *, refresh=False, max_age=None, missing_ok=False) -> str | None`**
 - Cache hit → cached HTML, unless `refresh=True` or older than `max_age` seconds.
 - Miss → rate-limited GET (`delay`), store, return.
-- **2xx** → HTML. **404** → raises, or `None` if `missing_ok`. **Other/transport** → raises.
+- **2xx** → HTML. **404** → raises, or `None` if `missing_ok`. **Other/transport** → raises
+  after up to 3 attempts with short exponential backoff (0.5s, 1s) — transport-level
+  failures only (timeouts, connection resets), not HTTP error statuses.
 
 Context manager (`with Client() as c:`) or `client.close()`. `delay=0.0` by default
 (the site is static S3); raise it if you want to throttle.
@@ -56,9 +60,10 @@ Pure, HTML-in / model-out. These fold parse+adapt into one call (no redundant ar
 and are the single home for assembly logic.
 
 ```python
-scraper.fleet_scores(full_scores_html, season, slug, *, division_html=None) -> RegattaScores
-scraper.team_scores(all_html, season, slug, *, full_scores_html=None, rotations_html=None) -> TeamRegattaScores
+scraper.fleet_scores(html, *, season, slug, division_html=None) -> RegattaScores
+scraper.team_scores(all_html, *, season, slug, full_scores_html=None, rotations_html=None) -> TeamRegattaScores
 ```
+`season`/`slug` are keyword-only on both.
 - `fleet_scores`: pass the `/full-scores/` HTML; optional `division_html={"A": html, ...}`
   fills per-division tiebreak ranks.
 - `team_scores`: pass the `/all/` HTML; optional `full_scores_html` adds official
@@ -67,6 +72,11 @@ scraper.team_scores(all_html, season, slug, *, full_scores_html=None, rotations_
 `RegattaScores.teams[]` → `place, school, school_slug, total, divisions{div: DivisionResult}`;
 `DivisionResult.races[]` → `race_num, points, penalty`. (Team models mirror this with
 `rounds`/`matches`.) `teams == []` means "no fleet scores" (team regatta or not yet posted).
+`total` is `int | None` — `None` for team racing (no fleet points total exists); in
+`results_frame()` it comes through as `NaN` (pandas has no per-cell `None` for a numeric
+column). Each race-level result also carries `penalty: str | None` (e.g. `"DNF"`,
+`"DSQ"`; `None` means a clean sailed finish) — see `Finish.penalty` and
+`SailorRaceFinish.penalty` below.
 
 ## Per-sailor results — `scraper.sailor_races`
 
@@ -74,16 +84,17 @@ The RP↔finish join — who sailed which race, and the place their boat earned.
 what makes sailor-level analysis (ELO, head-to-head) possible.
 
 ```python
-scraper.sailor_races(full_scores_html, sailors_html, season, slug) -> list[SailorRaceFinish]
-scraper.team_sailor_races(all_html, sailors_html, season, slug, *, sailor_links=None) -> list[SailorRaceFinish]
+scraper.sailor_races(full_scores_html, sailors_html=None, *, season, slug) -> list[SailorRaceFinish]
+scraper.team_sailor_races(all_html, sailors_html, *, season, slug, sailor_links=None) -> list[SailorRaceFinish]
 ```
-`sailor_races` is for fleet racing (pass `sailors_html=None` for singlehanded);
-`team_sailor_races` is the team-racing equivalent (joins RP to per-race earned
-positions; team-label resolution is best-effort).
+`season`/`slug` are keyword-only on both (identity stamped onto each row, not part
+of the parse). `sailor_races` is for fleet racing (pass `sailors_html=None` for
+singlehanded); `team_sailor_races` is the team-racing equivalent (joins RP to
+per-race earned positions; team-label resolution is best-effort).
 `SailorRaceFinish`: `sailor_slug, sailor_name, school_slug, team_name, division,
-race_num, place, boat_role` ("skipper"/"crew"). Handles the singlehanded path
-(RP synthesized from the full-scores page). Empty race-ranges are expanded to all
-division races.
+race_num, place, boat_role` ("skipper"/"crew"), `penalty: str | None` (e.g. `"DNF"`;
+`None` = clean finish). Handles the singlehanded path (RP synthesized from the
+full-scores page). Empty race-ranges are expanded to all division races.
 
 ## Querying a whole season — `scraper.load`
 
@@ -101,11 +112,19 @@ data = scraper.load("s26", client=my_client, refresh=False)
 |--------|------|-|
 | `data.regattas` | `list[RegattaScores \| TeamRegattaScores]` | iterable; `for reg in data:` too |
 | `data.results` | `list[Result]` | one per (regatta, school): `place, total, school_slug, regatta_slug, start_time, is_final` |
-| `data.sailor_races` | `list[SailorRaceFinish]` | pre-joined with regatta `grade/boat/participant/start_time` |
+| `data.sailor_races` | `list[SailorRaceFinish]` | pre-joined with regatta `regatta_type/boat/participant/start_time` |
 | `data.finishes` | `list[Finish]` | per team·race place |
 | `data.fleet()` / `data.team()` | `Dataset` | filter by scoring type (chainable) |
 | `data.school(slug)` / `data.sailor(slug)` | `Dataset` | narrow to one school/sailor (chainable) |
-| `data.results_frame()` / `data.sailor_races_frame()` | `DataFrame` | pandas escape hatch |
+| `data.schools` / `data.sailors` | `list[str]` | sorted, deduped slugs discoverable in the current (possibly narrowed) dataset |
+| `data.results_frame()` / `data.sailor_races_frame()` / `data.finishes_frame()` | `DataFrame` | pandas escape hatch; `start_time` comes back as real `datetime64`, not a string |
+| `data.regattas_frame()` | `DataFrame` | one row per regatta: identity, scoring, dates, `team_count`, and — when overview metadata was captured during `load` — `boat`/`participant`/`regatta_type` |
+
+`Result.total` is `int | None` (`None` for team racing, `NaN` in `results_frame()`).
+
+Every regatta and row is keyed internally by `(season, slug)`, so multi-season loads
+with a repeated slug (e.g. the same invitational scraped in both `f24` and `s25`)
+don't collide.
 
 `load` is a **snapshot**: exact for a finished season, immutable; for a live season pass
 `refresh=True` (or reload) so standings aren't frozen. Cached, so the first load is the
@@ -156,6 +175,8 @@ h2 = scraper.head_to_head("jane-doe", "john-roe", races=True)   # loads only the
 h2.races        # list[RaceEncounter]: same regatta·division·race both sailed
 h2.a_race_wins, h2.b_race_wins
 ```
+
+`h.shared_frame()` / `h.races_frame()` — pandas escape hatch for `.shared` / `.races`.
 
 | Call | Fetches | Grain |
 |------|---------|-------|

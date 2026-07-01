@@ -13,6 +13,7 @@ resets. The library never writes into its own install directory.
 
 import os
 import re
+import time
 from pathlib import Path
 
 
@@ -51,3 +52,16 @@ def has(url: str) -> bool:
     """Return True if url is already cached."""
     path = CACHE_DIR / _url_to_filename(url)
     return path.exists()
+
+
+def path(url: str) -> Path:
+    """Return the on-disk cache path for url (whether or not it exists)."""
+    return CACHE_DIR / _url_to_filename(url)
+
+
+def age(url: str) -> float | None:
+    """Seconds since url was cached, or None if not cached."""
+    p = CACHE_DIR / _url_to_filename(url)
+    if not p.exists():
+        return None
+    return time.time() - p.stat().st_mtime

@@ -23,9 +23,9 @@ from scraper.parsers.regatta import parse_team_ranking_table
 
 def fleet_scores(
     html: str | BeautifulSoup,
+    *,
     season: str,
     slug: str,
-    *,
     division_html: dict[str, str] | None = None,
 ) -> RegattaScores:
     """Assemble a fleet-racing regatta from its ``/full-scores/`` HTML.
@@ -59,9 +59,9 @@ def fleet_scores(
 
 def team_scores(
     all_html: str | BeautifulSoup,
+    *,
     season: str,
     slug: str,
-    *,
     full_scores_html: str | BeautifulSoup | None = None,
     rotations_html: str | BeautifulSoup | None = None,
 ) -> TeamRegattaScores:

@@ -41,11 +41,15 @@ class Dataset:
         results: list[Result],
         finishes: list[Finish],
         sailor_races: list[SailorRaceFinish],
+        metas: dict[tuple[str, str], RegattaMeta] | None = None,
     ) -> None:
         self.regattas = regattas
         self.results = results
         self.finishes = finishes
         self.sailor_races = sailor_races
+        # Overview-only metadata, keyed (season, slug); carried through filters
+        # so regattas_frame() stays enriched after chaining (e.g. data.fleet()).
+        self._metas = metas or {}
 
     def __iter__(self) -> Iterator[Regatta]:
         return iter(self.regattas)
@@ -65,12 +69,12 @@ class Dataset:
         cls,
         regattas: list[Regatta],
         sailor_races: list[SailorRaceFinish],
-        metas: dict[str, RegattaMeta] | None = None,
+        metas: dict[tuple[str, str], RegattaMeta] | None = None,
     ) -> Dataset:
         """Derive the flat projections from assembled regattas.
 
-        ``metas`` (regatta_slug → RegattaMeta) supplies overview-only context
-        (boat, participant, type) used to enrich sailor-race rows for ELO.
+        ``metas`` ((season, regatta_slug) → RegattaMeta) supplies overview-only
+        context (boat, participant, type) used to enrich sailor-race rows for ELO.
         """
         metas = metas or {}
         results: list[Result] = []
@@ -89,7 +93,7 @@ class Dataset:
                             school=tt.school,
                             team_name=tt.team_name,
                             place=tt.place,
-                            total=0,
+                            total=None,
                             is_final=reg.is_final,
                             start_time=reg.regatta_start,
                         )
@@ -122,17 +126,18 @@ class Dataset:
                                     division=div,
                                     race_num=rc.race_num,
                                     place=rc.points,
+                                    penalty=rc.penalty,
                                 )
                             )
 
         # Enrich sailor-race rows with regatta context.
-        reg_by_slug = {r.slug: r for r in regattas}
+        reg_by_key = {(r.season, r.slug): r for r in regattas}
         for sr in sailor_races:
-            rr = reg_by_slug.get(sr.regatta_slug)
+            rr = reg_by_key.get((sr.season, sr.regatta_slug))
             if rr is not None:
                 sr.regatta_name = rr.name
                 sr.start_time = rr.regatta_start
-            meta = metas.get(sr.regatta_slug)
+            meta = metas.get((sr.season, sr.regatta_slug))
             if meta is not None:
                 sr.boat = meta.boat
                 sr.participant = meta.participant
@@ -140,68 +145,125 @@ class Dataset:
                 if meta.start_time:
                     sr.start_time = meta.start_time  # ISO datetime beats date-only
 
-        return cls(regattas, results, finishes, sailor_races)
+        return cls(regattas, results, finishes, sailor_races, metas)
 
     # ── filters (chainable) ───────────────────────────────────────────────────
-    def _narrow(self, keep_slugs: set[str]) -> Dataset:
+    def _narrow(self, keep: set[tuple[str, str]]) -> Dataset:
         return Dataset(
-            [r for r in self.regattas if r.slug in keep_slugs],
-            [r for r in self.results if r.regatta_slug in keep_slugs],
-            [f for f in self.finishes if f.regatta_slug in keep_slugs],
-            [s for s in self.sailor_races if s.regatta_slug in keep_slugs],
+            [r for r in self.regattas if (r.season, r.slug) in keep],
+            [r for r in self.results if (r.season, r.regatta_slug) in keep],
+            [f for f in self.finishes if (f.season, f.regatta_slug) in keep],
+            [s for s in self.sailor_races if (s.season, s.regatta_slug) in keep],
+            self._metas,
         )
 
     def fleet(self) -> Dataset:
         """Only fleet-racing regattas (scoring_type != 'team')."""
         return self._narrow(
-            {r.slug for r in self.regattas if getattr(r, "scoring_type", "") != "team"}
+            {(r.season, r.slug) for r in self.regattas if getattr(r, "scoring_type", "") != "team"}
         )
 
     def team(self) -> Dataset:
         """Only team-racing regattas."""
         return self._narrow(
-            {r.slug for r in self.regattas if getattr(r, "scoring_type", "") == "team"}
+            {(r.season, r.slug) for r in self.regattas if getattr(r, "scoring_type", "") == "team"}
         )
 
     def school(self, slug: str) -> Dataset:
         """Narrow every projection to one school (regattas it appeared in)."""
-        keep = {r.regatta_slug for r in self.results if r.school_slug == slug}
+        keep = {(r.season, r.regatta_slug) for r in self.results if r.school_slug == slug}
         return Dataset(
-            [r for r in self.regattas if r.slug in keep],
+            [r for r in self.regattas if (r.season, r.slug) in keep],
             [r for r in self.results if r.school_slug == slug],
             [f for f in self.finishes if f.school_slug == slug],
             [s for s in self.sailor_races if s.school_slug == slug],
+            self._metas,
         )
 
     def sailor(self, slug: str) -> Dataset:
         """Narrow to one sailor's races (and the regattas they sailed)."""
         rows = [s for s in self.sailor_races if s.sailor_slug == slug]
-        keep = {s.regatta_slug for s in rows}
+        keep = {(s.season, s.regatta_slug) for s in rows}
         return Dataset(
-            [r for r in self.regattas if r.slug in keep],
-            [r for r in self.results if r.regatta_slug in keep],
-            [f for f in self.finishes if f.regatta_slug in keep],
+            [r for r in self.regattas if (r.season, r.slug) in keep],
+            [r for r in self.results if (r.season, r.regatta_slug) in keep],
+            [f for f in self.finishes if (f.season, f.regatta_slug) in keep],
             rows,
+            self._metas,
         )
 
+    # ── discovery ─────────────────────────────────────────────────────────────
+    @property
+    def schools(self) -> list[str]:
+        """Sorted, deduped school slugs that appear in ``results``."""
+        return sorted({r.school_slug for r in self.results})
+
+    @property
+    def sailors(self) -> list[str]:
+        """Sorted, deduped sailor slugs that appear in ``sailor_races``."""
+        return sorted({s.sailor_slug for s in self.sailor_races})
+
     # ── pandas escape hatch ───────────────────────────────────────────────────
-    def results_frame(self):
-        """``results`` as a pandas DataFrame (requires pandas)."""
+    @staticmethod
+    def _parse_start_time(df):
+        """Coerce a ``start_time`` column (mixed date/datetime strings) to datetime64."""
         import pandas as pd
 
-        return pd.DataFrame([vars(r) for r in self.results])
+        if "start_time" in df.columns and not df.empty:
+            df["start_time"] = pd.to_datetime(df["start_time"], errors="coerce", format="mixed")
+        return df
+
+    def results_frame(self):
+        """``results`` as a pandas DataFrame (requires pandas). ``start_time`` is datetime64."""
+        import pandas as pd
+
+        return self._parse_start_time(pd.DataFrame([vars(r) for r in self.results]))
 
     def sailor_races_frame(self):
-        """``sailor_races`` as a pandas DataFrame (requires pandas)."""
+        """``sailor_races`` as a pandas DataFrame (requires pandas). ``start_time`` is datetime64."""
         import pandas as pd
 
-        return pd.DataFrame([vars(s) for s in self.sailor_races])
+        return self._parse_start_time(pd.DataFrame([vars(s) for s in self.sailor_races]))
 
     def finishes_frame(self):
         """``finishes`` as a pandas DataFrame (requires pandas)."""
         import pandas as pd
 
         return pd.DataFrame([vars(f) for f in self.finishes])
+
+    def regattas_frame(self):
+        """One row per regatta: identity, scoring, dates, team_count, and — where a
+        ``RegattaMeta`` was captured during load — boat/participant/type enrichment.
+
+        Requires pandas. ``regatta_start`` is datetime64.
+        """
+        import pandas as pd
+
+        rows = []
+        for r in self.regattas:
+            meta = self._metas.get((r.season, r.slug))
+            rows.append(
+                {
+                    "season": r.season,
+                    "slug": r.slug,
+                    "name": r.name,
+                    "scoring_type": r.scoring_type,
+                    "host": r.host,
+                    "regatta_start": r.regatta_start,
+                    "regatta_end": r.regatta_end,
+                    "is_final": r.is_final,
+                    "team_count": len(r.teams),
+                    "boat": meta.boat if meta is not None else "",
+                    "participant": meta.participant if meta is not None else "",
+                    "regatta_type": meta.type if meta is not None else "",
+                }
+            )
+        df = pd.DataFrame(rows)
+        if "regatta_start" in df.columns and not df.empty:
+            df["regatta_start"] = pd.to_datetime(
+                df["regatta_start"], errors="coerce", format="mixed"
+            )
+        return df
 
 
 def _load_regatta(
@@ -228,7 +290,9 @@ def _load_regatta(
             return None, [], meta
         fs = client.fetch(urls.full_scores(season, slug), refresh=refresh, missing_ok=True)
         rot = client.fetch(urls.rotations(season, slug), refresh=refresh, missing_ok=True)
-        reg: Regatta = team_scores(all_html, season, slug, full_scores_html=fs, rotations_html=rot)
+        reg: Regatta = team_scores(
+            all_html, season=season, slug=slug, full_scores_html=fs, rotations_html=rot
+        )
         if build_sailors and meta.has_sailors_page:
             srh = client.fetch(urls.sailors(season, slug), refresh=refresh, missing_ok=True)
             if srh:
@@ -240,7 +304,7 @@ def _load_regatta(
     fs = client.fetch(urls.full_scores(season, slug), refresh=refresh, missing_ok=True)
     if not fs:
         return None, [], meta
-    fleet = fleet_scores(fs, season, slug)
+    fleet = fleet_scores(fs, season=season, slug=slug)
     if not fleet.teams:
         return None, [], meta
     if build_sailors:
@@ -270,10 +334,10 @@ def _collect(refs, client: Client, refresh: bool, build_sailors: bool, workers: 
 
     regattas: list[Regatta] = []
     sailor_rows: list[SailorRaceFinish] = []
-    metas: dict[str, RegattaMeta] = {}
+    metas: dict[tuple[str, str], RegattaMeta] = {}
     for (reg, rows, meta), (_season, slug) in zip(triples, refs):
         if meta is not None:
-            metas[slug] = meta
+            metas[(_season, slug)] = meta
         if reg is not None:
             regattas.append(reg)
             sailor_rows.extend(rows)
@@ -287,7 +351,7 @@ def load(
     client: Client | None = None,
     refresh: bool = False,
     sailors: bool = True,
-    workers: int = 8,
+    workers: int = 16,
 ) -> Dataset:
     """Scrape one or more seasons into a queryable :class:`Dataset`.
 
@@ -302,8 +366,10 @@ def load(
             fetches when you only need results/finishes (e.g. school rankings).
         workers: how many regattas to fetch concurrently. The work is
             latency-bound (many small requests to a static host), so the default
-            of 8 cuts a season scrape from minutes to seconds. Set ``1`` for a
-            strictly sequential fetch.
+            of 16 cuts a season scrape from minutes to seconds. Beyond ~16 the
+            GIL-bound HTML parsing becomes the floor (measured: 8→22s,
+            16→13s, 32→15s for a full season). Set ``1`` for a strictly
+            sequential fetch.
 
     Returns:
         A ``Dataset``. This is a point-in-time snapshot; re-load (or pass
@@ -338,7 +404,7 @@ def load_regattas(
     client: Client | None = None,
     refresh: bool = False,
     sailors: bool = True,
-    workers: int = 8,
+    workers: int = 16,
 ) -> Dataset:
     """Load an explicit, possibly cross-season set of regattas into a Dataset.
 
@@ -349,7 +415,7 @@ def load_regattas(
         client: a configured ``scraper.Client``; created/closed if omitted.
         refresh: bypass the disk cache and re-fetch.
         sailors: build per-sailor rows (set ``False`` to skip ``/sailors/`` fetches).
-        workers: regattas to fetch concurrently (default 8; 1 = sequential).
+        workers: regattas to fetch concurrently (default 16; 1 = sequential).
     """
     from scraper.client import Client  # lazy
 

@@ -78,24 +78,22 @@ def head_to_head(
             refs = sorted({(s.season, s.slug) for s in shared})
             data = load_regattas(refs, client=client, refresh=refresh)
             a_races = {
-                (r.regatta_slug, r.division, r.race_num): r.place
+                (r.season, r.regatta_slug, r.division, r.race_num): r.place
                 for r in data.sailor(a).sailor_races
             }
             b_races = {
-                (r.regatta_slug, r.division, r.race_num): r.place
+                (r.season, r.regatta_slug, r.division, r.race_num): r.place
                 for r in data.sailor(b).sailor_races
             }
-            for slug, div, race_num in sorted(a_races.keys() & b_races.keys()):
-                # season from the shared refs (slug is unique within this set)
-                season = next(s.season for s in shared if s.slug == slug)
+            for season, slug, div, race_num in sorted(a_races.keys() & b_races.keys()):
                 encounters.append(
                     RaceEncounter(
                         season=season,
                         regatta_slug=slug,
                         division=div,
                         race_num=race_num,
-                        place_a=a_races[(slug, div, race_num)],
-                        place_b=b_races[(slug, div, race_num)],
+                        place_a=a_races[(season, slug, div, race_num)],
+                        place_b=b_races[(season, slug, div, race_num)],
                     )
                 )
 

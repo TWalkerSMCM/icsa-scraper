@@ -25,6 +25,7 @@ class SailorRaceFinish:
     race_num: int
     place: int  # scored finish (penalized) the boat earned in this race
     boat_role: str  # "skipper" | "crew"
+    penalty: str | None = None  # e.g. "DNF", "DSQ"; None for a clean sailed finish
     # Regatta context — blank from a bare sailor_races() call; filled by Dataset.
     regatta_name: str = ""
     start_time: str = ""  # ISO 8601; use for chronological ordering (ELO)
@@ -45,7 +46,7 @@ class Result:
     school: str
     team_name: str
     place: int
-    total: int  # fleet points total; 0 for team racing
+    total: int | None  # fleet points total; None for team racing (no fleet total exists)
     is_final: bool
     start_time: str = ""
 
@@ -61,6 +62,7 @@ class Finish:
     division: str
     race_num: int
     place: int
+    penalty: str | None = None  # e.g. "DNF", "DSQ"; None for a clean sailed finish
 
 
 @dataclass
@@ -122,3 +124,16 @@ class HeadToHead:
     @property
     def b_race_wins(self) -> int:
         return sum(1 for r in self.races if r.place_b < r.place_a)
+
+    # ── pandas escape hatch ───────────────────────────────────────────────────
+    def shared_frame(self):
+        """``shared`` as a pandas DataFrame (requires pandas)."""
+        import pandas as pd
+
+        return pd.DataFrame([vars(s) for s in self.shared])
+
+    def races_frame(self):
+        """``races`` as a pandas DataFrame (requires pandas)."""
+        import pandas as pd
+
+        return pd.DataFrame([vars(r) for r in self.races])

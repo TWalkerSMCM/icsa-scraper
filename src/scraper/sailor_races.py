@@ -100,6 +100,7 @@ def _join_fleet(
             if td is None:
                 continue
             places = {rs.race_num: rs.score for rs in td.race_scores if rs.score is not None}
+            penalties = {rs.race_num: rs.modifier or None for rs in td.race_scores}
             for rn in ids.expand_races(e.races, sorted(places)):
                 if rn in places:
                     out.append(
@@ -114,6 +115,7 @@ def _join_fleet(
                             race_num=rn,
                             place=places[rn],
                             boat_role=e.boat_role,
+                            penalty=penalties.get(rn),
                         )
                     )
     else:
@@ -137,6 +139,7 @@ def _join_fleet(
                         race_num=rs.race_num,
                         place=rs.score,
                         boat_role="skipper",
+                        penalty=rs.modifier or None,
                     )
                 )
     return out

@@ -48,6 +48,55 @@ def test_join_fleet_rp_expands_ranges_and_looks_up_place():
     assert skip[0].school_slug == "navy" and skip[0].division == "A"
 
 
+def test_join_fleet_rp_carries_penalty_per_race():
+    rp = [
+        RpEntry(
+            "Navy",
+            "/schools/navy/s26/",
+            "Navy",
+            "A",
+            1,
+            "Jane Doe",
+            "/sailors/jane-doe/",
+            "skipper",
+            "",
+        ),
+    ]
+    div = TeamDivScore(
+        school_name="Navy",
+        school_url="/schools/navy/s26/",
+        school_id="navy",
+        team_name="Navy",
+        division="A",
+        penalty="",
+        race_scores=[FSRace(1, 1, ""), FSRace(2, 6, "DNF")],
+        div_total=7,
+    )
+    rows = _join_fleet([div], rp, "s26", "reg")
+    by_race = {r.race_num: r for r in rows}
+    assert by_race[1].penalty is None
+    assert by_race[2].penalty == "DNF"
+
+
+def test_join_fleet_singlehanded_carries_penalty():
+    ds = TeamDivScore(
+        "MIT",
+        "/schools/mit/s26/",
+        "mit",
+        "",
+        "A",
+        "",
+        [FSRace(1, 2, ""), FSRace(2, 7, "DSQ")],
+        9,
+        sailor_name="Sam Sail",
+        sailor_url="/sailors/sam-sail/",
+    )
+    rows = _join_fleet([ds], [], "s26", "reg")
+    by_race = {r.race_num: r for r in rows}
+    assert by_race[1].penalty is None
+    assert by_race[2].penalty == "DSQ"
+
+
 def test_join_fleet_disambiguates_ab_teams_by_name():
     a1 = TeamDivScore(
         "Navy", "/schools/navy/s26/", "navy", "Navy 1", "A", "", [FSRace(1, 2, "")], 2

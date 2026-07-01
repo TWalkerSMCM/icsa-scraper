@@ -26,7 +26,15 @@ Import those modules explicitly when you need them.
 
 from __future__ import annotations
 
-from scraper import adapter, cache, models
+from scraper import adapter, cache, ids, models, urls, views
+from scraper.assemble import fleet_scores, team_scores
+from scraper.sailor_races import sailor_races, team_sailor_races
+from scraper.dataset import Dataset, load, load_regattas
+from scraper.head_to_head import head_to_head
+from scraper.parsers.sailor_profile import parse as sailor_profile, SailorParticipation
+from scraper.views import (
+    Finish, HeadToHead, RaceEncounter, Result, SailorRaceFinish, SharedRegatta,
+)
 from scraper.parsers import (
     division,
     full_scores,
@@ -43,10 +51,45 @@ from scraper.parsers import (
 
 __version__ = "0.1.0"
 
+# Network-touching pieces (need the `fetch` extra: httpx) are imported lazily so
+# a core install can `import scraper` without httpx present.
+_LAZY = {"Client"}
+
+
+def __getattr__(name: str):
+    if name in _LAZY:
+        from scraper import client as _client
+        return getattr(_client, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
+    # analysis / assembly
+    "urls",
+    "ids",
+    "fleet_scores",
+    "team_scores",
+    "sailor_races",
+    "team_sailor_races",
+    "sailor_profile",
+    "SailorParticipation",
+    "load",
+    "load_regattas",
+    "head_to_head",
+    "Dataset",
+    "Result",
+    "Finish",
+    "SailorRaceFinish",
+    "SharedRegatta",
+    "RaceEncounter",
+    "HeadToHead",
+    "views",
+    "Client",
+    # data layers
     "adapter",
     "cache",
     "models",
+    # parsers
     "division",
     "full_scores",
     "metadata",

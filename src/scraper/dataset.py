@@ -251,12 +251,27 @@ def _load_regatta(
     return fleet, rows, meta
 
 
-def _collect(refs, client: Client, refresh: bool, build_sailors: bool) -> Dataset:
+def _collect(refs, client: Client, refresh: bool, build_sailors: bool, workers: int) -> Dataset:
+    refs = list(refs)
+
+    def load_one(ref):
+        return _load_regatta(client, ref[0], ref[1], refresh, build_sailors)
+
+    # Fetch regattas concurrently — the work is latency-bound, httpx.Client is
+    # thread-safe, and the disk cache writes one file per URL. Results keep input
+    # order (executor.map is ordered).
+    if workers > 1 and len(refs) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            triples = list(pool.map(load_one, refs))
+    else:
+        triples = [load_one(ref) for ref in refs]
+
     regattas: list[Regatta] = []
     sailor_rows: list[SailorRaceFinish] = []
     metas: dict[str, RegattaMeta] = {}
-    for season, slug in refs:
-        reg, rows, meta = _load_regatta(client, season, slug, refresh, build_sailors)
+    for (reg, rows, meta), (_season, slug) in zip(triples, refs):
         if meta is not None:
             metas[slug] = meta
         if reg is not None:
@@ -272,6 +287,7 @@ def load(
     client: Client | None = None,
     refresh: bool = False,
     sailors: bool = True,
+    workers: int = 8,
 ) -> Dataset:
     """Scrape one or more seasons into a queryable :class:`Dataset`.
 
@@ -284,6 +300,10 @@ def load(
         refresh: bypass the disk cache and re-fetch (use for live regattas).
         sailors: build per-sailor rows. Set ``False`` to skip the ``/sailors/``
             fetches when you only need results/finishes (e.g. school rankings).
+        workers: how many regattas to fetch concurrently. The work is
+            latency-bound (many small requests to a static host), so the default
+            of 8 cuts a season scrape from minutes to seconds. Set ``1`` for a
+            strictly sequential fetch.
 
     Returns:
         A ``Dataset``. This is a point-in-time snapshot; re-load (or pass
@@ -306,7 +326,7 @@ def load(
                 if index is None:
                     continue
                 refs.extend((season, stub.nick) for stub in _season_parser.parse(index, season))
-        return _collect(refs, client, refresh, sailors)
+        return _collect(refs, client, refresh, sailors, workers)
     finally:
         if own_client:
             client.close()
@@ -318,6 +338,7 @@ def load_regattas(
     client: Client | None = None,
     refresh: bool = False,
     sailors: bool = True,
+    workers: int = 8,
 ) -> Dataset:
     """Load an explicit, possibly cross-season set of regattas into a Dataset.
 
@@ -328,13 +349,14 @@ def load_regattas(
         client: a configured ``scraper.Client``; created/closed if omitted.
         refresh: bypass the disk cache and re-fetch.
         sailors: build per-sailor rows (set ``False`` to skip ``/sailors/`` fetches).
+        workers: regattas to fetch concurrently (default 8; 1 = sequential).
     """
     from scraper.client import Client  # lazy
 
     own_client = client is None
     client = client or Client()
     try:
-        return _collect(list(refs), client, refresh, sailors)
+        return _collect(list(refs), client, refresh, sailors, workers)
     finally:
         if own_client:
             client.close()

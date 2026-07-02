@@ -38,11 +38,13 @@ Pure functions returning site-relative paths (core install, no deps).
 ## Fetching — `scraper.Client`
 
 ```python
-Client(base_url=DEFAULT, cache_dir=None, user_agent=DEFAULT, delay=0.0, timeout=30.0)
+Client(base_url=DEFAULT, cache_dir=None, user_agent=DEFAULT, delay=0.0, timeout=30.0, transport=None)
 ```
 Owns one `httpx` session + the rate-limit clock, all as instance state — no module
 globals. `cache_dir` is per-instance: two `Client`s (or a `Client` and bare
 `scraper.cache` calls) never share or clobber each other's cache location.
+`transport` is a test-only escape hatch — pass an `httpx.MockTransport` to exercise
+the full `Client` + cache + retry stack against synthetic responses, no real network.
 
 **`client.fetch(path, *, refresh=False, max_age=None, missing_ok=False) -> str | None`**
 - Cache hit → cached HTML, unless `refresh=True` or older than `max_age` seconds.

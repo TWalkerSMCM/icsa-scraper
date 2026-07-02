@@ -15,5 +15,8 @@ venv/
 # Scraper on-disk cache (default location)
 .scraper_cache/
 
+# Local data exports (generate with scraper.load(...).sailor_races_frame().to_csv(...))
+*.csv
+
 # OS
 .DS_Store

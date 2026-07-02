@@ -91,3 +91,4 @@ monorepo), plus the library tour:
 | Sailor Head-to-Head | `sailor-head-to-head.ipynb` |
 | Fleet Racing Head-to-Head | `fleet-head-to-head.ipynb` |
 | Team Racing Head-to-Head | `team-head-to-head.ipynb` |
+| — (utility: CSV export) | `export-skipper-finishes.ipynb` |

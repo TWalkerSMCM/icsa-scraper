@@ -92,6 +92,7 @@ executable analysis. Conventions live in
 | [`sailor-head-to-head.ipynb`](examples/sailor-head-to-head.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/sailor-head-to-head.ipynb) | Two sailors compared — shared regattas and race-by-race encounters |
 | [`fleet-head-to-head.ipynb`](examples/fleet-head-to-head.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/fleet-head-to-head.ipynb) | Two schools across shared fleet regattas — record and place gaps |
 | [`team-head-to-head.ipynb`](examples/team-head-to-head.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/team-head-to-head.ipynb) | Two schools' direct team-racing matches — W-L-T and combos |
+| [`export-skipper-finishes.ipynb`](examples/export-skipper-finishes.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/export-skipper-finishes.ipynb) | Utility: dump every skipper finish in a season to a flat CSV |
 
 ## Google Colab
 

@@ -35,7 +35,10 @@ Conventions for `examples/*.ipynb`. The reference implementation is
    display; finish with a single clear matplotlib figure, not a gallery.
    An optional interactive companion (plotly, which ships with Colab) may
    follow the static chart when hover detail genuinely helps — the static
-   chart stays, since GitHub renders it and plotly it won't.
+   matplotlib chart stays as the baseline because it renders in any
+   environment with no JS frontend or extra install. (Outputs are stripped
+   on commit, so neither chart shows on GitHub — charts only exist when a
+   reader runs the notebook.)
 7. **Closing markdown** — where to go next (chainable filters, multi-season
    loads, deeper model fields).
 

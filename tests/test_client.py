@@ -74,3 +74,82 @@ def test_fetch_raises_after_exhausting_retries(tmp_path: Path, monkeypatch) -> N
         client.fetch("/some/path")
 
     assert calls["n"] == 3
+
+
+def _mock_client(tmp_path: Path, responses: dict[str, str]) -> tuple[Client, list[str]]:
+    """A Client wired to an httpx.MockTransport serving ``responses`` by path,
+    tracking every requested path in the returned list."""
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        requested.append(path)
+        if path in responses:
+            return httpx.Response(200, text=responses[path])
+        return httpx.Response(404, text="not found")
+
+    client = Client(cache_dir=tmp_path, transport=httpx.MockTransport(handler))
+    return client, requested
+
+
+def test_refresh_true_refetches_and_overwrites_cache(tmp_path: Path) -> None:
+    client, requested = _mock_client(tmp_path, {"/p": "<html>v1</html>"})
+    assert client.fetch("/p") == "<html>v1</html>"
+    assert requested == ["/p"]
+
+    # Same content still served without a request when not refreshing.
+    assert client.fetch("/p") == "<html>v1</html>"
+    assert requested == ["/p"]
+
+    # New content on the transport; refresh=True re-fetches and overwrites.
+    responses = {"/p": "<html>v2</html>"}
+    client2, requested2 = _mock_client(tmp_path, responses)
+    assert client2.fetch("/p") == "<html>v1</html>"  # served from cache, no request
+    assert requested2 == []
+    assert client2.fetch("/p", refresh=True) == "<html>v2</html>"
+    assert requested2 == ["/p"]
+    # The overwrite persists for subsequent (non-refresh) fetches.
+    assert client2.fetch("/p") == "<html>v2</html>"
+    assert requested2 == ["/p"]
+
+
+def test_max_age_fresh_cache_skips_request(tmp_path: Path) -> None:
+    client, requested = _mock_client(tmp_path, {"/p": "<html>ok</html>"})
+    assert client.fetch("/p") == "<html>ok</html>"
+    assert requested == ["/p"]
+
+    assert client.fetch("/p", max_age=3600) == "<html>ok</html>"
+    assert requested == ["/p"]  # still fresh, no new request
+
+
+def test_max_age_stale_cache_triggers_refetch(tmp_path: Path) -> None:
+    import os
+
+    from scraper import cache
+
+    client, requested = _mock_client(tmp_path, {"/p": "<html>old</html>"})
+    assert client.fetch("/p") == "<html>old</html>"
+    assert requested == ["/p"]
+
+    # Back-date the cached file's mtime so it reads as stale.
+    cached_path = cache.path(client._url("/p"), cache_dir=tmp_path)
+    old_time = cached_path.stat().st_mtime - 3600
+    os.utime(cached_path, (old_time, old_time))
+
+    client2, requested2 = _mock_client(tmp_path, {"/p": "<html>new</html>"})
+    assert client2.fetch("/p", max_age=60) == "<html>new</html>"
+    assert requested2 == ["/p"]
+
+
+def test_missing_ok_404_returns_none_and_does_not_cache(tmp_path: Path) -> None:
+    client, requested = _mock_client(tmp_path, {})  # nothing exists -> 404
+    assert client.fetch("/missing", missing_ok=True) is None
+    assert requested == ["/missing"]
+
+    from scraper import cache
+
+    assert cache.has(client._url("/missing"), cache_dir=tmp_path) is False
+
+    # A subsequent fetch retries rather than being permanently cached as a miss.
+    assert client.fetch("/missing", missing_ok=True) is None
+    assert requested == ["/missing", "/missing"]

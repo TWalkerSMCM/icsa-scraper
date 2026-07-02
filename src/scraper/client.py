@@ -38,6 +38,11 @@ class Client:
             Enforced across threads when one ``Client`` is shared by a
             ``ThreadPoolExecutor`` (e.g. ``scraper.load(workers=...)``).
         timeout: per-request timeout in seconds.
+        transport: an optional ``httpx.BaseTransport`` override. ``None`` keeps
+            httpx's default transport (real network I/O). This is an escape
+            hatch for tests — pass an ``httpx.MockTransport`` to exercise the
+            full ``Client`` + cache + retry stack against synthetic responses
+            with no real network access.
     """
 
     def __init__(
@@ -47,6 +52,7 @@ class Client:
         user_agent: str = USER_AGENT,
         delay: float = 0.0,
         timeout: float = 30.0,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.cache_dir = Path(cache_dir) if cache_dir is not None else None
@@ -57,6 +63,7 @@ class Client:
             headers={"User-Agent": user_agent},
             timeout=timeout,
             follow_redirects=True,
+            transport=transport,
         )
 
     def _url(self, path: str) -> str:

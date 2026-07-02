@@ -86,6 +86,7 @@ monorepo), plus the library tour:
 | (library tour) | `quickstart.ipynb` |
 | Competitive Strength Rankings | `csr-ranking.ipynb` |
 | Fleet Race Skipper Elo | `skipper-elo.ipynb` |
+| — (companion: cross-division skipper strengths) | `skipper-bradley-terry.ipynb` |
 | Team Race Elo Ratings | `team-elo.ipynb` |
 | Sailor Head-to-Head | `sailor-head-to-head.ipynb` |
 | Fleet Racing Head-to-Head | `fleet-head-to-head.ipynb` |

@@ -17,14 +17,18 @@ Conventions for `examples/*.ipynb`. The reference implementation is
 3. **Install cell** — always the same shape, guarded so a local execution
    can't clobber an editable dev install with the GitHub version:
    ```python
-   # Fresh runtimes (Colab) need the library; skip when it's already importable
-   # (a local venv) so this can't clobber an editable dev install.
-   import importlib.util
+   # Fresh runtimes (Colab) need the library. Guard on the distribution name so
+   # re-running locally can't clobber an editable dev install; to force-update a
+   # cached Colab runtime, restart it (or run the %pip line with --force-reinstall).
+   from importlib.metadata import PackageNotFoundError, version
 
-   if importlib.util.find_spec("scraper") is None:
+   try:
+       version("icsa-scraper")
+   except PackageNotFoundError:
        %pip install -q "icsa-scraper[fetch] @ git+https://github.com/TWalkerSMCM/icsa-scraper"
-       # pandas + matplotlib ship with Colab; add them here if missing elsewhere.
    ```
+   Guard on the distribution (`icsa-scraper`), not the module (`scraper`) —
+   the module name is generic enough to collide.
 4. **Formula/constants before data** — explain the method in markdown, then a
    constants cell, then the function cells. A reader should understand the
    computation before any scraping happens.

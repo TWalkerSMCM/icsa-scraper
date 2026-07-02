@@ -33,6 +33,9 @@ Conventions for `examples/*.ipynb`. The reference implementation is
    so a reader can sanity-check their run.
 6. **Compute → DataFrame → one chart** — pandas frames are the primary
    display; finish with a single clear matplotlib figure, not a gallery.
+   An optional interactive companion (plotly, which ships with Colab) may
+   follow the static chart when hover detail genuinely helps — the static
+   chart stays, since GitHub renders it and plotly it won't.
 7. **Closing markdown** — where to go next (chainable filters, multi-season
    loads, deeper model fields).
 

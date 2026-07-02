@@ -275,3 +275,53 @@ def test_load_order_is_stable_regardless_of_fetch_completion_order(tmp_path):
     data = load("s26", client=client, sailors=False, workers=4)
 
     assert [r.slug for r in data.regattas] == slugs
+
+
+# ---------------------------------------------------------------------------
+# progress=True
+# ---------------------------------------------------------------------------
+
+
+def test_progress_bar_updates_per_regatta(tmp_path, monkeypatch):
+    """progress=True drives the bar once per regatta and closes it."""
+    from scraper import dataset
+
+    events = []
+
+    class Bar:
+        def __init__(self, total):
+            events.append(("total", total))
+
+        def update(self, n=1):
+            events.append(("update", n))
+
+        def close(self):
+            events.append(("close",))
+
+    monkeypatch.setattr(dataset, "_make_bar", Bar)
+
+    pages = {
+        "/s26/": season_index_page([("cactus-cup", "Cactus Cup"), ("hood", "Hood Trophy")]),
+        "/s26/cactus-cup/": overview_page("s26", "cactus-cup", "Cactus Cup", has_sailors=False),
+        "/s26/cactus-cup/full-scores/": fleet_full_scores_page(2),
+        "/s26/hood/": overview_page("s26", "hood", "Hood Trophy", has_sailors=False),
+        "/s26/hood/full-scores/": fleet_full_scores_page(2),
+    }
+    with make_client(pages, tmp_path) as client:
+        load("s26", client=client, sailors=False, workers=1, progress=True)
+
+    assert events[0] == ("total", 2)
+    assert events.count(("update", 1)) == 2
+    assert events[-1] == ("close",)
+
+
+def test_plain_bar_fallback_writes_stderr(capsys):
+    """_PlainBar (the no-tqdm fallback) counts on stderr and is closeable."""
+    from scraper.dataset import _PlainBar
+
+    bar = _PlainBar(3)
+    bar.update()
+    bar.update()
+    bar.close()
+    err = capsys.readouterr().err
+    assert "2/3 regattas" in err

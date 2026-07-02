@@ -322,22 +322,72 @@ def _load_regatta(
     return fleet, rows, meta
 
 
-def _collect(refs, client: Client, refresh: bool, build_sailors: bool, workers: int) -> Dataset:
+class _PlainBar:
+    """Minimal stderr progress counter used when tqdm isn't installed."""
+
+    def __init__(self, total: int) -> None:
+        import threading
+
+        self.total = total
+        self.done = 0
+        self._lock = threading.Lock()
+
+    def update(self, n: int = 1) -> None:
+        import sys
+
+        with self._lock:
+            self.done += n
+            print(f"\r{self.done}/{self.total} regattas", end="", file=sys.stderr, flush=True)
+
+    def close(self) -> None:
+        import sys
+
+        print(file=sys.stderr)
+
+
+def _make_bar(total: int):
+    """A text tqdm bar, or the plain fallback when tqdm isn't installed.
+
+    Deliberately the plain-text tqdm (not ``tqdm.auto``): the widget flavor
+    needs ipywidgets plus a frontend renderer, while the text bar draws on
+    stderr everywhere — terminals, notebooks, nbconvert. tqdm auto-detects
+    whether the stream can render unicode blocks and falls back to ASCII.
+    """
+    try:
+        from tqdm import tqdm
+
+        return tqdm(total=total, unit="regatta", desc="load")
+    except ImportError:
+        return _PlainBar(total)
+
+
+def _collect(
+    refs, client: Client, refresh: bool, build_sailors: bool, workers: int, progress: bool = False
+) -> Dataset:
     refs = list(refs)
+    bar = _make_bar(len(refs)) if progress and refs else None
 
     def load_one(ref):
-        return _load_regatta(client, ref[0], ref[1], refresh, build_sailors)
+        try:
+            return _load_regatta(client, ref[0], ref[1], refresh, build_sailors)
+        finally:
+            if bar is not None:
+                bar.update(1)
 
     # Fetch regattas concurrently — the work is latency-bound, httpx.Client is
     # thread-safe, and the disk cache writes one file per URL. Results keep input
     # order (executor.map is ordered).
-    if workers > 1 and len(refs) > 1:
-        from concurrent.futures import ThreadPoolExecutor
+    try:
+        if workers > 1 and len(refs) > 1:
+            from concurrent.futures import ThreadPoolExecutor
 
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            triples = list(pool.map(load_one, refs))
-    else:
-        triples = [load_one(ref) for ref in refs]
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                triples = list(pool.map(load_one, refs))
+        else:
+            triples = [load_one(ref) for ref in refs]
+    finally:
+        if bar is not None:
+            bar.close()
 
     regattas: list[Regatta] = []
     sailor_rows: list[SailorRaceFinish] = []
@@ -359,6 +409,7 @@ def load(
     refresh: bool = False,
     sailors: bool = True,
     workers: int = 16,
+    progress: bool = False,
 ) -> Dataset:
     """Scrape one or more seasons into a queryable :class:`Dataset`.
 
@@ -377,6 +428,8 @@ def load(
             GIL-bound HTML parsing becomes the floor (measured: 8→22s,
             16→13s, 32→15s for a full season). Set ``1`` for a strictly
             sequential fetch.
+        progress: show a per-regatta text progress bar on stderr — tqdm when
+            installed (Colab ships it), else a plain counter. Quiet by default.
 
     Returns:
         A ``Dataset``. This is a point-in-time snapshot; re-load (or pass
@@ -399,7 +452,7 @@ def load(
                 if index is None:
                     continue
                 refs.extend((season, stub.nick) for stub in _season_parser.parse(index, season))
-        return _collect(refs, client, refresh, sailors, workers)
+        return _collect(refs, client, refresh, sailors, workers, progress)
     finally:
         if own_client:
             client.close()
@@ -412,6 +465,7 @@ def load_regattas(
     refresh: bool = False,
     sailors: bool = True,
     workers: int = 16,
+    progress: bool = False,
 ) -> Dataset:
     """Load an explicit, possibly cross-season set of regattas into a Dataset.
 
@@ -423,13 +477,15 @@ def load_regattas(
         refresh: bypass the disk cache and re-fetch.
         sailors: build per-sailor rows (set ``False`` to skip ``/sailors/`` fetches).
         workers: regattas to fetch concurrently (default 16; 1 = sequential).
+        progress: show a per-regatta progress bar (tqdm when installed, else a
+            plain stderr counter).
     """
     from scraper.client import Client  # lazy
 
     own_client = client is None
     client = client or Client()
     try:
-        return _collect(list(refs), client, refresh, sailors, workers)
+        return _collect(list(refs), client, refresh, sailors, workers, progress)
     finally:
         if own_client:
             client.close()

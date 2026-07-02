@@ -103,6 +103,7 @@ Scrape a season (or several) into memory once, then loop/query.
 ```python
 data = scraper.load("s26")                 # one season
 data = scraper.load(["f24", "s25"])        # a full academic year
+data = scraper.load("s26", progress=True)  # per-regatta progress bar (tqdm if installed)
 data = scraper.load("s26", client=my_client, refresh=False)
 ```
 

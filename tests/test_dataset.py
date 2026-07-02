@@ -292,3 +292,57 @@ def test_schools_and_sailors_properties():
     d = _dataset()
     assert d.schools == ["harvard", "navy", "yale"]
     assert d.sailors == ["bob-roe", "jane-doe"]
+
+
+def test_frames_mixed_utc_offsets():
+    """A season's regattas mix UTC offsets; frames must not raise (utc=True)."""
+    import pytest
+
+    pytest.importorskip("pandas")
+    rows = [
+        SailorRaceFinish(
+            "s25",
+            "east",
+            "a-b",
+            "A B",
+            "navy",
+            "Navy",
+            "A",
+            1,
+            1,
+            "skipper",
+            start_time="2025-04-05T09:30-04:00",
+        ),
+        SailorRaceFinish(
+            "s25",
+            "west",
+            "c-d",
+            "C D",
+            "stanford",
+            "Stanford",
+            "A",
+            1,
+            1,
+            "skipper",
+            start_time="2025-04-05T09:30-07:00",
+        ),
+        SailorRaceFinish(
+            "s25",
+            "plain",
+            "e-f",
+            "E F",
+            "yale",
+            "Yale",
+            "A",
+            1,
+            1,
+            "skipper",
+            start_time="2025-04-06",  # date-only, no offset
+        ),
+    ]
+    d = Dataset([], [], [], rows)
+    df = d.sailor_races_frame()
+    assert str(df["start_time"].dtype).startswith("datetime64")
+    assert df["start_time"].notna().all()
+    # chronological order survives normalization: -04:00 sorts before -07:00 same wall time
+    assert df["start_time"].iloc[0] < df["start_time"].iloc[1] < df["start_time"].iloc[2]

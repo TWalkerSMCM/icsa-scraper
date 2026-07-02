@@ -206,11 +206,18 @@ class Dataset:
     # ── pandas escape hatch ───────────────────────────────────────────────────
     @staticmethod
     def _parse_start_time(df):
-        """Coerce a ``start_time`` column (mixed date/datetime strings) to datetime64."""
+        """Coerce a ``start_time`` column (mixed date/datetime strings) to datetime64.
+
+        Regattas publish start times in their local UTC offset, so a full
+        season mixes offsets; ``utc=True`` normalizes them (pandas raises on
+        a naive mix). Date-only values come out tz-aware at midnight UTC.
+        """
         import pandas as pd
 
         if "start_time" in df.columns and not df.empty:
-            df["start_time"] = pd.to_datetime(df["start_time"], errors="coerce", format="mixed")
+            df["start_time"] = pd.to_datetime(
+                df["start_time"], errors="coerce", format="mixed", utc=True
+            )
         return df
 
     def results_frame(self):

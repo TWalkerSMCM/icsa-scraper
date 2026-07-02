@@ -11,13 +11,11 @@ Conventions for `examples/*.ipynb`. The reference implementation is
    ```
 2. **Title + intro** — `# icsa-scraper · <Feature Name>`, Title Case (keep
    acronyms like `CSR`/`CSV` uppercase), then what question the notebook
-   answers in one or two sentences. If it reproduces a webapp feature, cite
-   it in exactly this form: "the [analytics webapp](https://collegeanalytics.goforthom.as)"
-   (link once per notebook, on first mention). If the feature's authoritative
-   implementation lives in the `icsa-tools` monorepo, cite the path and line
-   count too, e.g. "lives at `analytics/skipper_elo/engine.py` in the
-   `icsa-tools` monorepo (339 lines)" — the notebook is a readable
-   reproduction, not the source of truth.
+   answers in one or two sentences. Notebooks are **self-contained**: explain
+   the method in the notebook itself, and cite only public sources where they
+   genuinely help (papers — e.g. Bradley–Terry 1952, Hunter 2004; the ICSA
+   CSR scoring method; standard Elo). Never reference private repos or
+   internal paths — they are dead ends for a public reader.
 3. **Install cell** — always the same shape, guarded so a local execution
    can't clobber an editable dev install with the GitHub version:
    ```python
@@ -107,19 +105,16 @@ Conventions for `examples/*.ipynb`. The reference implementation is
   comments only where the code can't speak (scoring quirks, dedupe wrinkles
   like multi-team schools or both-perspectives match rows).
 
-## Coverage map
+## Catalog
 
-One notebook per primary webapp feature (`analytics/web/src/pages/` in the
-monorepo), plus the library tour:
-
-| Webapp feature | Notebook |
+| Notebook | What it does |
 |---|---|
-| (library tour) | `quickstart.ipynb` |
-| Competitive Strength Rankings | `csr-ranking.ipynb` |
-| Fleet Race Skipper Elo | `skipper-elo.ipynb` |
-| — (companion: cross-division skipper strengths) | `skipper-bradley-terry.ipynb` |
-| Team Race Elo Ratings | `team-elo.ipynb` |
-| Sailor Head-to-Head | `sailor-head-to-head.ipynb` |
-| Fleet Racing Head-to-Head | `fleet-head-to-head.ipynb` |
-| Team Racing Head-to-Head | `team-head-to-head.ipynb` |
-| — (utility: CSV export) | `export-skipper-finishes.ipynb` |
+| `quickstart.ipynb` | Guided tour of the library: load a season into a `Dataset`, frames, chart, then under the hood |
+| `csr-ranking.ipynb` | Competitive Strength Rankings — grade-weighted best-N school scoring |
+| `skipper-elo.ipynb` | Fleet-race skipper Elo — per-race pairwise ratings, K by regatta grade |
+| `skipper-bradley-terry.ipynb` | Bradley–Terry skipper strengths — one scale spanning A and B divisions |
+| `team-elo.ipynb` | Team-race Elo — match-level school ratings with margin-of-victory weighting |
+| `sailor-head-to-head.ipynb` | Two sailors compared — shared regattas and race-by-race encounters |
+| `fleet-head-to-head.ipynb` | Two schools across shared fleet regattas — record and place gaps |
+| `team-head-to-head.ipynb` | Two schools' direct team-racing matches — W-L-T and position combos |
+| `export-skipper-finishes.ipynb` | Utility: dump every skipper finish in a season to a flat CSV |

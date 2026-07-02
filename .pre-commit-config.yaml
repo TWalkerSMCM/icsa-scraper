@@ -37,18 +37,18 @@ repos:
     hooks:
       - id: zizmor
 
-  # ── types + tests (use the project's own env) ────────────────────────────────
+  # ── types + tests (use the project's own venv, not whatever's on PATH) ──────
   - repo: local
     hooks:
       - id: mypy
         name: mypy
-        entry: mypy src
+        entry: .venv/bin/python -m mypy src
         language: system
         pass_filenames: false
         types: [python]
       - id: pytest
         name: pytest
-        entry: pytest -q
+        entry: .venv/bin/python -m pytest -q
         language: system
         pass_filenames: false
         types: [python]

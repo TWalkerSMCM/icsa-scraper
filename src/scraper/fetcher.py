@@ -79,7 +79,7 @@ class InMemoryETagStore:
 def _is_transient(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code not in (404, 410, 403, 401)
-    return isinstance(exc, (httpx.TimeoutException, httpx.NetworkError))
+    return isinstance(exc, httpx.TimeoutException | httpx.NetworkError)
 
 
 # ---------------------------------------------------------------------------

@@ -78,11 +78,19 @@ HTML string or a pre-parsed `BeautifulSoup`.
 
 ## Examples
 
-[`examples/quickstart.ipynb`](examples/quickstart.ipynb)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/quickstart.ipynb)
-— a guided tour: load a season into a `Dataset`, explore it as a pandas
-DataFrame and a chart, then peek under the hood at the `Client` + parser
-layers. Click the badge to run it in Colab.
+Every notebook opens in Colab from its badge; each is a self-contained,
+executable analysis. Conventions live in
+[`docs/notebook-style.md`](docs/notebook-style.md).
+
+| Notebook | What it does |
+|----------|--------------|
+| [`quickstart.ipynb`](examples/quickstart.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/quickstart.ipynb) | Guided tour: load a season into a `Dataset`, frames, chart, then under the hood |
+| [`csr-ranking.ipynb`](examples/csr-ranking.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/csr-ranking.ipynb) | Competitive Strength Rankings — grade-weighted best-N school scoring |
+| [`skipper-elo.ipynb`](examples/skipper-elo.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/skipper-elo.ipynb) | Fleet-race skipper Elo — per-race pairwise ratings, K by regatta grade |
+| [`team-elo.ipynb`](examples/team-elo.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/team-elo.ipynb) | Team-race Elo — match-level ratings with margin-of-victory weighting |
+| [`sailor-head-to-head.ipynb`](examples/sailor-head-to-head.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/sailor-head-to-head.ipynb) | Two sailors compared — shared regattas and race-by-race encounters |
+| [`fleet-head-to-head.ipynb`](examples/fleet-head-to-head.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/fleet-head-to-head.ipynb) | Two schools across shared fleet regattas — record and place gaps |
+| [`team-head-to-head.ipynb`](examples/team-head-to-head.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TWalkerSMCM/icsa-scraper/blob/main/examples/team-head-to-head.ipynb) | Two schools' direct team-racing matches — W-L-T and combos |
 
 ## Google Colab
 
